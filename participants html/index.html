@@ -1,0 +1,2441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskGPT</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+  <style>
+    :root {
+      --bg-main: #000000;
+      --bg-chat: #000000;
+      --bg-sidebar: #0d0d0d;
+      --bg-surface: #212121;
+      --bg-surface-hover: #2f2f2f;
+      --bg-user-bubble: #582e88;
+      --border-subtle: rgba(255, 255, 255, 0.1);
+      --accent-purple: #7c3aed;
+      --accent-purple-hover: #6d28d9;
+      --accent-purple-light: #a78bfa;
+      --accent-green: #10b981;
+      --text-primary: #ececec;
+      --text-secondary: #b4b4b4;
+      --text-muted: #8e8ea0;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+    }
+
+    #app-root {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Left Sidebar */
+    .sidebar {
+      width: 280px;
+      background-color: var(--bg-sidebar);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 14px;
+      flex-shrink: 0;
+      z-index: 20;
+    }
+
+    .sidebar-header {
+      padding: 4px 6px 14px 6px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .taskgpt-badge {
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      letter-spacing: -0.2px;
+    }
+
+    .taskgpt-badge span.accent {
+      color: var(--accent-purple-light);
+    }
+
+    /* Participant Box */
+    .code-display-card {
+      background: rgba(124, 58, 237, 0.08);
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .code-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .code-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: #c084fc;
+      font-family: monospace;
+      letter-spacing: 0.5px;
+    }
+
+    /* Study Process Steps */
+    .sidebar-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      margin: 14px 4px 8px 4px;
+    }
+
+    .process-step-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 18px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .process-step-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      padding: 4px 6px;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .process-step-item.active {
+      color: #ffffff;
+      font-weight: 600;
+      background: rgba(124, 58, 237, 0.15);
+    }
+
+    .process-step-item.completed {
+      color: #34d399;
+      font-weight: 500;
+    }
+
+    .step-badge-circle {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .process-step-item.active .step-badge-circle {
+      background: var(--accent-purple);
+      color: #ffffff;
+    }
+
+    .process-step-item.completed .step-badge-circle {
+      background: rgba(16, 185, 129, 0.25);
+      color: #34d399;
+    }
+
+    /* Study Tasks */
+    .task-selector-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .task-nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+
+    
+    .task-nav-item.locked {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .task-nav-item.locked:hover {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
+    .task-nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+    }
+
+    .task-nav-item.active {
+      background: #1c1926;
+      border-color: rgba(124, 58, 237, 0.3);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* Badges */
+    .task-status-badge {
+      font-size: 10.5px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .task-status-badge.ready {
+      background: rgba(255, 255, 255, 0.08);
+      color: #a1a1aa;
+    }
+
+    .task-status-badge.active {
+      background: rgba(124, 58, 237, 0.25);
+      color: #c084fc;
+      border: 1px solid rgba(167, 139, 250, 0.35);
+    }
+
+    .task-status-badge.completed {
+      background: rgba(16, 185, 129, 0.25);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, 0.35);
+    }
+
+    .sidebar-bottom {
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .sidebar-btn {
+      width: 100%;
+      padding: 9px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 12.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .sidebar-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .sidebar-footnote {
+      font-size: 11px;
+      color: #52525b;
+      text-align: center;
+      margin-top: 4px;
+    }
+
+    /* Main Chat View */
+    .main-chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background-color: var(--bg-chat);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Chat Navbar */
+    .chat-navbar {
+      height: 52px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    .chat-navbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .chat-navbar-title {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-scenario-btn {
+      background: rgba(124, 58, 237, 0.15);
+      border: 1px solid rgba(124, 58, 237, 0.3);
+      border-radius: 6px;
+      color: #c084fc;
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 6px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .nav-scenario-btn:hover {
+      background: rgba(124, 58, 237, 0.25);
+      color: #ffffff;
+    }
+
+    /* Messages Thread */
+    .messages-thread {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      scroll-behavior: smooth;
+    }
+
+    .messages-inner-wrapper {
+      width: 100%;
+      max-width: 820px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Message Rows */
+    .msg-row {
+      display: flex;
+      width: 100%;
+    }
+
+    .msg-row.user {
+      justify-content: flex-end;
+    }
+
+    .msg-row.user .msg-bubble {
+      background-color: var(--bg-user-bubble);
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 20px;
+      max-width: 82%;
+      line-height: 1.5;
+      font-size: 14.5px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .msg-row.ai {
+      justify-content: flex-start;
+    }
+
+    .msg-row.ai .msg-bubble {
+      width: 100%;
+      color: var(--text-primary);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    /* Thinking Pill (Worked for 17s >) */
+    .thinking-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      margin-bottom: 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .thinking-pill:hover {
+      color: #fff;
+    }
+
+    .ai-intro-text {
+      color: var(--text-primary);
+      margin-bottom: 20px;
+      line-height: 1.65;
+      font-size: 15px;
+      white-space: pre-line;
+    }
+
+    .ai-intro-text strong {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* 3 Horizontal Photos (Straight Line - Fix 1) */
+    .straight-line-photos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 18px 0 24px 0;
+    }
+
+    .straight-photo-card {
+      border-radius: 14px;
+      overflow: hidden;
+      aspect-ratio: 4 / 3;
+      background: #18181b;
+      position: relative;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    }
+
+    .straight-photo-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.3s ease;
+    }
+
+    .straight-photo-card:hover img {
+      transform: scale(1.03);
+    }
+
+    .photo-badge-counter {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.68);
+      backdrop-filter: blur(4px);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    /* Section Heading */
+    .section-title-heading {
+      font-size: 18px;
+      font-weight: 600;
+      color: #ffffff;
+      margin: 24px 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Day-by-Day Schedule (Fix 2) */
+    .day-by-day-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+
+    .day-schedule-card {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+    }
+
+    .day-thumbnail-wrap {
+      width: 135px;
+      height: 135px;
+      border-radius: 14px;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: #18181b;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+
+    .day-thumbnail-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.3s ease;
+    }
+
+    .day-thumbnail-wrap:hover img {
+      transform: scale(1.03);
+    }
+
+    .day-content-wrap {
+      flex: 1;
+      padding-top: 4px;
+    }
+
+    .day-header-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+
+    .day-description-text {
+      font-size: 14.5px;
+      color: #d4d4d8;
+      line-height: 1.55;
+    }
+
+    /* Interactive Map (Fix 3) */
+    .interactive-map-wrapper {
+      border-radius: 16px;
+      overflow: hidden;
+      margin: 16px 0 28px 0;
+      background: #0f131d;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      position: relative;
+    }
+
+    .map-controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #18181b;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .map-route-tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .map-tab-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      color: #d4d4d8;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .map-tab-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    .map-tab-btn.active {
+      background: var(--accent-purple);
+      border-color: #a78bfa;
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+    }
+
+    .map-canvas-area {
+      position: relative;
+      width: 100%;
+      height: 480px;
+      background: #0b0f19 url('assets/london_trip_map.jpg') center/cover no-repeat;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .map-svg-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .route-path-line {
+      fill: none;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 10, 8;
+      animation: routeDash 1.6s linear infinite;
+      filter: drop-shadow(0 0 6px currentColor);
+    }
+
+    @keyframes routeDash {
+      to { stroke-dashoffset: -36; }
+    }
+
+    .route-day1 { stroke: #fbbf24; color: #fbbf24; }
+    .route-day2 { stroke: #38bdf8; color: #38bdf8; }
+    .route-day3 { stroke: #10b981; color: #10b981; }
+
+    .map-hotspot {
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .map-hotspot:hover {
+      transform: scale(1.08);
+      transform-origin: center;
+    }
+
+    .map-info-floating-card {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      max-width: 520px;
+      background: rgba(18, 22, 34, 0.94);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 12px 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      z-index: 10;
+    }
+
+    .info-card-left {
+      flex: 1;
+    }
+
+    .info-stop-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .info-stop-desc {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    .info-transit-badge {
+      font-size: 11px;
+      color: #c084fc;
+      background: rgba(124, 58, 237, 0.15);
+      border: 1px solid rgba(124, 58, 237, 0.3);
+      padding: 5px 9px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+
+    /* Structured Forms for B & C */
+    .structured-form-box {
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin: 18px 0;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .form-heading-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-heading-sub {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .q-group {
+      margin-bottom: 14px;
+    }
+
+    .q-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #d4d4d8;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 18px;
+      padding: 6px 14px;
+      color: var(--text-secondary);
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chip-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    .chip-btn.selected {
+      background: var(--accent-purple);
+      border-color: #a78bfa;
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+    }
+
+    .form-submit-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Primary Buttons (Always Purple) */
+    .btn-primary, .btn-submit-action {
+      background: var(--accent-purple);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 11px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-primary:hover, .btn-submit-action:hover {
+      background: var(--accent-purple-hover);
+    }
+
+    .btn-primary:active, .btn-submit-action:active {
+      transform: scale(0.98);
+    }
+
+    /* Task Complete Banner */
+    .task-complete-box {
+      margin-top: 24px;
+      padding: 16px 20px;
+      border-radius: 12px;
+      background: rgba(124, 58, 237, 0.08);
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .complete-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14.5px;
+      font-weight: 600;
+      color: #c084fc;
+    }
+
+    /* Typing Dots */
+    .typing-container {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 0;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      animation: pulse 1.4s infinite ease-in-out;
+    }
+    .dot:nth-child(1) { animation-delay: -0.32s; }
+    .dot:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes pulse {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1.1); opacity: 1; }
+    }
+
+    /* Bottom Chat Prompt Bar */
+    .chat-input-bar-container {
+      padding: 14px 20px 20px 20px;
+      background-color: var(--bg-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .chat-input-box {
+      width: 100%;
+      max-width: 820px;
+      background: #212121;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 28px;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      transition: border-color 0.2s;
+    }
+
+    .chat-input-box:focus-within {
+      border-color: rgba(124, 58, 237, 0.5);
+    }
+
+    .chat-input-box.disabled-locked {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .input-plus-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: #b4b4b4;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .chat-input-field {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #ececec;
+      font-size: 15px;
+      resize: none;
+      font-family: inherit;
+      line-height: 24px;
+      height: 24px;
+    }
+
+    .input-actions-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pill-medium-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #d4d4d8;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+
+    .mic-icon-btn {
+      background: transparent;
+      border: none;
+      color: #b4b4b4;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .voice-purple-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent-purple);
+      border: none;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .send-arrow-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 700;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    .send-arrow-btn:not(:disabled) {
+      background: var(--accent-purple);
+      color: #ffffff;
+    }
+
+    .send-arrow-btn:disabled {
+      background: #333333;
+      color: #71717a;
+      cursor: not-allowed;
+    }
+
+    .disclaimer-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    /* Modal Styles */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .modal-card {
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      max-width: 620px;
+      width: 100%;
+      padding: 28px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+      position: relative;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .modal-sub {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .code-input-field {
+      width: 100%;
+      background: #09090b;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #fff;
+      font-size: 20px;
+      font-family: monospace;
+      text-align: center;
+      letter-spacing: 2px;
+      margin-bottom: 18px;
+      outline: none;
+      text-transform: uppercase;
+    }
+    .code-input-field:focus {
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
+    }
+
+    /* Likert Survey - Smooth and Glitch-Free */
+    .likert-block {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+
+    .likert-question-text {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #ececec;
+      margin-bottom: 12px;
+    }
+
+    .likert-numbers-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+
+    .likert-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 4px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+    }
+
+    .likert-cell:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .likert-cell:active {
+      transform: scale(0.95);
+    }
+
+    .likert-cell.selected {
+      background: var(--accent-purple);
+      border-color: #a78bfa;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+    }
+
+    .likert-cell-num {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .likert-cell-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.1;
+    }
+
+    .likert-cell.selected .likert-cell-label {
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    /* Empty state */
+    .empty-state-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      text-align: center;
+      width: 100%;
+    }
+
+    .empty-hero-icon {
+      font-size: 44px;
+      color: var(--accent-purple-light);
+      margin-bottom: 16px;
+    }
+
+    .empty-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .empty-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      max-width: 480px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .prompt-launcher-card {
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 16px 20px;
+      max-width: 520px;
+      width: 100%;
+      text-align: left;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .prompt-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .prompt-tag {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--accent-purple-light);
+    }
+
+    .prompt-content-quote {
+      font-size: 14.5px;
+      color: #ececec;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      font-style: italic;
+    }
+
+    .prompt-card-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-subtle {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-subtle:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    /* Floating Toast */
+    .toast-popup {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #27272a;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      z-index: 200;
+      animation: toastIn 0.2s ease-out;
+    }
+
+    @keyframes toastIn {
+      from { transform: translateY(12px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app-root">
+    <!-- Left Sidebar -->
+    <aside class="sidebar">
+      <div>
+        <div class="sidebar-header">
+          <div class="taskgpt-badge">
+            Task<span class="accent">GPT</span>
+          </div>
+        </div>
+
+        <!-- 1. Participant Number (P01 to P24) -->
+        <div class="code-display-card">
+          <span class="code-label">Participant:</span>
+          <span class="code-val" id="sidebar-participant-code">Not set</span>
+        </div>
+
+        <!-- 2. Study Process Steps -->
+        <div class="sidebar-section-title">Study Process Steps</div>
+        <div class="process-step-list">
+          <div class="process-step-item" id="step-1">
+            <span class="step-badge-circle" id="badge-step-1">1</span>
+            <span>Task briefing</span>
+          </div>
+          <div class="process-step-item" id="step-2">
+            <span class="step-badge-circle" id="badge-step-2">2</span>
+            <span>Enter chat and prompt</span>
+          </div>
+          <div class="process-step-item" id="step-3">
+            <span class="step-badge-circle" id="badge-step-3">3</span>
+            <span>AI response</span>
+          </div>
+          <div class="process-step-item" id="step-4">
+            <span class="step-badge-circle" id="badge-step-4">4</span>
+            <span>Post-task questionnaire</span>
+          </div>
+        </div>
+
+        <!-- 3. Study Tasks (1, 2, 3) -->
+        <div class="sidebar-section-title">Study Tasks</div>
+        <div class="task-selector-list" id="task-selector-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="sidebar-bottom">
+        <button id="view-task-briefing-btn" class="sidebar-btn" onclick="app.showBriefingModal()">
+          📋 Scenario Context
+        </button>
+        <div class="sidebar-footnote">TaskGPT • Controlled UX Study</div>
+      </div>
+    </aside>
+
+    <!-- Main Chat View -->
+    <main class="main-chat-container">
+      <!-- Navbar -->
+      <header class="chat-navbar">
+        <div class="chat-navbar-left">
+          <div class="chat-navbar-title" id="chat-header-title">
+            <span>Plan London Trip ▾</span>
+          </div>
+        </div>
+        <div class="nav-actions-right">
+          <button class="nav-scenario-btn" onclick="app.showBriefingModal()">
+            <span>📖</span>
+            <span>Scenario Context</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Messages Thread -->
+      <div class="messages-thread" id="messages-thread">
+        <div class="messages-inner-wrapper" id="messages-inner">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Chat Input Field -->
+      <footer class="chat-input-bar-container">
+        <div class="chat-input-box" id="chat-input-container">
+          <button class="input-plus-btn" title="Attach file">+</button>
+          <input type="text" class="chat-input-field" id="chat-textarea" placeholder="Ask TaskGPT..." autocomplete="off">
+          <div class="input-actions-right">
+            <div class="pill-medium-btn">
+              <span>Medium</span>
+              <span style="font-size: 10px;">▾</span>
+            </div>
+            <button class="mic-icon-btn" title="Voice dictation">🎙️</button>
+            <div class="voice-purple-btn" title="Voice Mode">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zm5 10a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/>
+              </svg>
+            </div>
+            <button class="send-arrow-btn" id="send-btn" title="Send message" onclick="app.handleSend()">
+              ↑
+            </button>
+          </div>
+        </div>
+        <div class="disclaimer-text">
+          TaskGPT can make mistakes. Check important info.
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Modal Container -->
+  <div id="modal-layer"></div>
+
+  <script>
+    // 1. Task Definitions with Clean Scenario Context
+    const TASK_SPECS = {
+      1: {
+        taskNumber: 1,
+        taskName: "Travel",
+        title: "Travel Planning",
+        chatTitle: "Plan London Trip ▾",
+        scenario: "You are planning a 2-night trip to London with your partner for next month. You have an approximate budget of around £350 for spending, and you are mainly interested in exploring food and markets, preferring central activities with minimal travel between locations.",
+        prompt: "Help me plan a short trip to London for next month.",
+        heroPhotos: [
+          { src: "assets/hero_covent_garden.jpg", alt: "Covent Garden festive lights & tree" },
+          { src: "assets/hero_london_eye.jpg", alt: "London Eye twilight over Thames" },
+          { src: "assets/hero_winter_wonderland.jpg", alt: "Hyde Park Winter Wonderland fairground", badge: "8" }
+        ],
+        daysA: [
+          { day: "Day 1: Iconic London", img: "assets/day1_westminster.jpg", desc: "Arrive in London, visit Big Ben and Westminster Bridge, see the London Eye and walk along the South Bank. Enjoy the festive market in the evening." },
+          { day: "Day 2: Shopping and Christmas vibes", img: "assets/day2_covent_bells.jpg", desc: "Explore Covent Garden, Leicester Square, Piccadilly Circus and Oxford Street. Finish at Hyde Park Winter Wonderland for rides, festive food and entertainment." },
+          { day: "Day 3: Markets and sightseeing", img: "assets/day3_tower_bridge.jpg", desc: "Visit Tower Bridge and Borough Market, enjoy lunch and take some photos before travelling back to Birmingham." }
+        ],
+        daysTailored: [
+          { day: "Day 1: Borough Market & South Bank Walk", img: "assets/hero_covent_garden.jpg", desc: "Arrive for artisan street food at Borough Market, hot raclette, and Monmouth coffee, followed by an evening stroll along the festive South Bank." },
+          { day: "Day 2: Seven Dials & Central Food Halls", img: "assets/day2_covent_bells.jpg", desc: "Explore Covent Garden's Seven Dials Market with 20+ independent micro-kitchens, artisan bakeries, and romantic sharing plates within budget." },
+          { day: "Day 3: Maltby Street & Riverside Morning", img: "assets/day3_tower_bridge.jpg", desc: "Breakfast pastries at Maltby Street Market railway arches, stroll across Tower Bridge before catching your departure train." }
+        ],
+        clarificationQuestions: [
+          { id: "duration", label: "How long would you like to stay?", options: ["1 night", "2 nights", "3 nights"], default: "2 nights" },
+          { id: "budget", label: "What is your approximate budget?", options: ["Under £250", "£250–£400", "£400+"], default: "£250–£400" },
+          { id: "companions", label: "Who are you travelling with?", options: ["Alone", "Partner", "Friends", "Family"], default: "Partner" },
+          { id: "interests", label: "What are you most interested in?", options: ["Food and markets", "Museums and history", "Shopping", "Nightlife"], default: "Food and markets" }
+        ]
+      },
+
+      2: {
+        taskNumber: 2,
+        taskName: "Dinner",
+        title: "Dinner Recipe Ideas",
+        chatTitle: "Dinner Ideas Tonight ▾",
+        scenario: "You are planning dinner for two tonight and need a quick, simple meal. You want a vegetarian dish that takes around 20 minutes to cook, using ingredients you already have on hand such as pasta, tomatoes, and spinach.",
+        prompt: "I need ideas for what to cook for dinner tonight. Keep it simple.",
+        heroPhotos: null,
+        daysA: [
+          { day: "Step 1 & 2: Sear Seasoned Chicken", img: "assets/dinner_creamy_chicken.jpg", desc: "Bring pasta water to a boil. Heat olive oil in a skillet and sear 300g seasoned chicken breast for 6 minutes until golden." },
+          { day: "Step 3: Garlic Cream Sauce", img: "assets/day2_covent_bells.jpg", desc: "Sauté minced garlic in butter for 60 seconds. Pour in double cream, bring to a simmer, and stir in grated Parmesan until smooth." },
+          { day: "Step 4: Combine & Serve", img: "assets/dinner_tomato_spinach.jpg", desc: "Fold in fresh baby spinach leaves and tossed pasta for 2 minutes until tender. Serves two." }
+        ],
+        daysTailored: [
+          { day: "Step 1: Boil Pasta (10 mins)", img: "assets/dinner_tomato_spinach.jpg", desc: "Boil penne pasta in salted water for 9–10 minutes until al dente. Reserve 1/4 cup cooking water before draining." },
+          { day: "Step 2: Blister Cherry Tomatoes & Garlic (5 mins)", img: "assets/dinner_creamy_chicken.jpg", desc: "Heat olive oil in a pan. Sauté 3 cloves sliced garlic and halved cherry tomatoes until they burst and create a natural light sauce." },
+          { day: "Step 3: Wilt Fresh Spinach & Toss (3 mins)", img: "assets/day1_westminster.jpg", desc: "Fold in 120g fresh spinach for 90 seconds until tender. Toss with pasta and starchy water. 100% vegetarian, ready in 20 minutes for two." }
+        ],
+        clarificationQuestions: [
+          { id: "diet", label: "Dietary preference:", options: ["No restriction", "Vegetarian", "Vegan"], default: "Vegetarian" },
+          { id: "time", label: "Cooking time available:", options: ["10 minutes", "20 minutes", "30+ minutes"], default: "20 minutes" },
+          { id: "servings", label: "Number of people:", options: ["1", "2", "3+"], default: "2" },
+          { id: "ingredients", label: "Ingredients on hand:", options: ["Pasta, tomatoes and spinach", "Rice and vegetables", "Potatoes and vegetables"], default: "Pasta, tomatoes and spinach" }
+        ]
+      },
+
+      3: {
+        taskNumber: 3,
+        taskName: "Budgeting",
+        title: "House Deposit Budgeting",
+        chatTitle: "House Deposit Budget ▾",
+        scenario: "You want to start saving money for a house deposit and need a workable budget. Your monthly take-home income is £2,200 with £1,400 in essential monthly spending, and your goal is to save a £12,000 deposit over an 18-month timeframe.",
+        prompt: "I want to start saving money for a house deposit. How do I make a budget?",
+        heroPhotos: null,
+        daysA: [
+          { day: "Needs (50%): £1,000 / month", img: "assets/budget_house_deposit.jpg", desc: "Covers essential fixed living costs including rent, council tax, utilities, groceries, and travel." },
+          { day: "Wants (30%): £600 / month", img: "assets/hero_covent_garden.jpg", desc: "Flexible spending for dining out, entertainment, shopping, and weekend leisure." },
+          { day: "Deposit Savings (20%): £400 / month", img: "assets/hero_london_eye.jpg", desc: "At £400/month, reaching a £20,000 deposit target will take approximately 50 months (~4.2 years)." }
+        ],
+        daysTailored: [
+          { day: "Essential Living (63.6%): £1,400", img: "assets/budget_house_deposit.jpg", desc: "Exact fixed essential costs (rent, bills, groceries) leaving a £800 monthly surplus." },
+          { day: "Deposit Savings Target (30.3%): £667 / month", img: "assets/day3_tower_bridge.jpg", desc: "Saving £667 per month over 18 months hits exactly £12,006, reaching your £12,000 target on schedule." },
+          { day: "Discretionary Buffer (6.1%): £133 / month", img: "assets/hero_winter_wonderland.jpg", desc: "Remaining flexible spending fund to handle minor social activities without touching savings." }
+        ],
+        clarificationQuestions: [
+          { id: "income", label: "Monthly take-home income:", options: ["£1,800", "£2,200", "£2,600"], default: "£2,200" },
+          { id: "essentials", label: "Essential spending (rent, bills, food):", options: ["£1,000", "£1,400", "£1,800"], default: "£1,400" },
+          { id: "target", label: "Deposit target:", options: ["£8,000", "£12,000", "£20,000"], default: "£12,000" },
+          { id: "timeframe", label: "Target timeframe:", options: ["12 months", "18 months", "24 months"], default: "18 months" }
+        ]
+      }
+    };
+
+    // 2. Exact Latin-Square Sequences
+    const SEQUENCES = {
+      S1: ["A1", "B2", "C3"],
+      S2: ["B3", "C1", "A2"],
+      S3: ["C2", "A3", "B1"],
+      S4: ["C3", "B2", "A1"],
+      S5: ["A2", "C1", "B3"],
+      S6: ["B1", "A3", "C2"]
+    };
+
+    function resolveSequenceForParticipant(code) {
+      if (!code) return { seqKey: "S1", order: SEQUENCES.S1 };
+      const cleaned = code.toUpperCase().trim();
+      const numMatch = cleaned.match(/(\d+)/);
+      if (!numMatch) return { seqKey: "S1", order: SEQUENCES.S1 };
+
+      const num = parseInt(numMatch[1], 10);
+      if (num >= 1 && num <= 4) return { seqKey: "S1", order: SEQUENCES.S1 };
+      if (num >= 5 && num <= 8) return { seqKey: "S2", order: SEQUENCES.S2 };
+      if (num >= 9 && num <= 12) return { seqKey: "S3", order: SEQUENCES.S3 };
+      if (num >= 13 && num <= 16) return { seqKey: "S4", order: SEQUENCES.S4 };
+      if (num >= 17 && num <= 20) return { seqKey: "S5", order: SEQUENCES.S5 };
+      if (num >= 21 && num <= 24) return { seqKey: "S6", order: SEQUENCES.S6 };
+
+      const seqKeys = ["S1", "S2", "S3", "S4", "S5", "S6"];
+      const key = seqKeys[(num - 1) % 6];
+      return { seqKey: key, order: SEQUENCES[key] };
+    }
+
+    const LIKERT_QUESTIONS = [
+      "This interaction required a lot of effort.",
+      "The system gave me what I actually wanted.",
+      "I felt in control of this conversation.",
+      "I trusted the recommendations provided."
+    ];
+
+    // Map Coordinates
+    const MAP_LOCATIONS = {
+      winter: { id: "winter", name: "Winter Wonderland", icon: "🎄", day: "Day 2", x: 110, y: 620, desc: "Hyde Park festive fairground rides, illuminated swings & food stalls" },
+      oxford: { id: "oxford", name: "Oxford Street", icon: "🛍️", day: "Day 2", x: 400, y: 320, desc: "Festive flagship shopping under world-famous London Christmas lights" },
+      leicester: { id: "leicester", name: "Leicester Square", icon: "🎭", day: "Day 2", x: 650, y: 470, desc: "West End theatre heartland, cinema premieres & holiday market" },
+      covent: { id: "covent", name: "Covent Garden", icon: "🛍️", day: "Day 2", x: 820, y: 415, desc: "Historic piazza, giant Christmas tree, bells & Seven Dials market" },
+      westminster: { id: "westminster", name: "Big Ben & Westminster", icon: "📷", day: "Day 1", x: 780, y: 770, desc: "Parliament Square, Elizabeth Tower and Westminster Bridge" },
+      eye: { id: "eye", name: "London Eye", icon: "🎡", day: "Day 1", x: 900, y: 720, desc: "Iconic observation wheel with twilight panoramic views of London" },
+      southbank: { id: "southbank", name: "Southbank Centre", icon: "🎄", day: "Day 1", x: 960, y: 600, desc: "Riverside winter market chalets, mulled drinks & live street performers" },
+      borough: { id: "borough", name: "Borough Market", icon: "🍴", day: "Day 3", x: 1480, y: 640, desc: "World-class artisan food market, hot raclette, oysters & cheeses" },
+      bridge: { id: "bridge", name: "Tower Bridge", icon: "📷", day: "Day 3", x: 1780, y: 640, desc: "Victorian Gothic suspension bridge crossing over the River Thames" }
+    };
+
+    // Controller
+    class TaskGPTApp {
+      constructor() {
+        // ALWAYS prompt for participant code on refresh / load
+        this.participantCode = "";
+        this.seqInfo = resolveSequenceForParticipant("");
+        this.currentTaskIdx = 0;
+        this.completedTasks = [false, false, false];
+
+        this.chatMessages = [];
+        this.isWaiting = false;
+        this.isDone = false;
+        this.selectedOptions = {};
+        this.ratings = [null, null, null, null];
+        this.currentProcessStep = 1; // 1: Briefing, 2: Chat & Prompt, 3: AI Response, 4: Questionnaire
+
+        // Timing
+        this.taskStartTime = null;
+
+        // Map State
+        this.activeMapRoute = 'all';
+        this.selectedMapStop = 'westminster';
+
+        // Bind DOM elements
+        this.messagesThread = document.getElementById("messages-thread");
+        this.messagesInner = document.getElementById("messages-inner");
+        this.chatTextarea = document.getElementById("chat-textarea");
+        this.sendBtn = document.getElementById("send-btn");
+        this.inputContainer = document.getElementById("chat-input-container");
+        this.navbarPill = document.getElementById("chat-header-title");
+        this.modalLayer = document.getElementById("modal-layer");
+        this.taskSelectorList = document.getElementById("task-selector-list");
+        this.sidebarCode = document.getElementById("sidebar-participant-code");
+
+        this.initEvents();
+        this.initApp();
+      }
+
+      initEvents() {
+        this.chatTextarea.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            this.handleSend();
+          }
+        });
+
+        this.chatTextarea.addEventListener("input", () => {
+          this.sendBtn.disabled = this.chatTextarea.value.trim().length === 0;
+        });
+      }
+
+      initApp() {
+        // Always prompt for participant code first
+        this.showCodeEntryModal();
+      }
+
+      setProcessStep(stepNum) {
+        this.currentProcessStep = stepNum;
+        for (let i = 1; i <= 4; i++) {
+          const item = document.getElementById(`step-${i}`);
+          const badge = document.getElementById(`badge-step-${i}`);
+          if (!item || !badge) continue;
+
+          item.classList.remove("active", "completed");
+          if (i < stepNum) {
+            item.classList.add("completed");
+            badge.textContent = "✓";
+          } else if (i === stepNum) {
+            item.classList.add("active");
+            badge.textContent = String(i);
+          } else {
+            badge.textContent = String(i);
+          }
+        }
+      }
+
+      updateSidebarUI() {
+        this.sidebarCode.textContent = this.participantCode || "Not set";
+
+        let tasksHtml = "";
+        this.seqInfo.order.forEach((code, idx) => {
+          const tNum = parseInt(code.charAt(1), 10);
+          const spec = TASK_SPECS[tNum];
+          const isDone = this.completedTasks[idx];
+          const isCurrent = this.currentTaskIdx === idx;
+
+          let badgeClass = "ready";
+          let badgeText = "Ready";
+
+          if (isDone) {
+            badgeClass = "completed";
+            badgeText = "Completed";
+          } else if (isCurrent) {
+            badgeClass = "active";
+            badgeText = "Active";
+          }
+
+          const isUnlocked = idx === 0 || (idx === 1 && this.completedTasks[0]) || (idx === 2 && this.completedTasks[0] && this.completedTasks[1]);
+          if (!isUnlocked && !isDone) {
+            badgeText = "🔒 Ready";
+          }
+
+          tasksHtml += `
+            <button class="task-nav-item ${isCurrent ? 'active' : ''} ${!isUnlocked && !isDone ? 'locked' : ''}" onclick="app.selectTaskFromSidebar(${idx})">
+              <span>${idx + 1}. ${spec.title}</span>
+              <span class="task-status-badge ${badgeClass}">${badgeText}</span>
+            </button>
+          `;
+        });
+
+        this.taskSelectorList.innerHTML = tasksHtml;
+      }
+
+      selectTaskFromSidebar(idx) {
+        if (this.currentTaskIdx === idx) return;
+
+        // Enforce sequential task completion:
+        if (idx === 1 && !this.completedTasks[0]) {
+          this.showToast("⚠️ Please finish Task 1 before moving to Task 2.");
+          return;
+        }
+        if (idx === 2) {
+          if (!this.completedTasks[0]) {
+            this.showToast("⚠️ Please finish Task 1 and Task 2 before moving to Task 3.");
+            return;
+          }
+          if (!this.completedTasks[1]) {
+            this.showToast("⚠️ Please finish Task 2 before moving to Task 3.");
+            return;
+          }
+        }
+
+        this.loadTask(idx);
+      }
+
+      loadTask(idx) {
+        this.currentTaskIdx = idx;
+        this.isDone = this.completedTasks[idx];
+        this.chatMessages = [];
+        this.selectedOptions = {};
+        this.ratings = [null, null, null, null];
+        this.taskStartTime = new Date();
+
+        this.chatTextarea.disabled = false;
+        this.chatTextarea.value = "";
+        this.chatTextarea.placeholder = "Ask TaskGPT...";
+        this.inputContainer.classList.remove("disabled-locked");
+        this.sendBtn.disabled = true;
+
+        this.setProcessStep(2); // Step 2: Enter chat and prompt
+        this.updateSidebarUI();
+        this.renderChat();
+      }
+
+      currentTaskCode() {
+        return this.seqInfo.order[this.currentTaskIdx];
+      }
+
+      currentCondition() {
+        return this.currentTaskCode().charAt(0);
+      }
+
+      currentTaskNumber() {
+        return parseInt(this.currentTaskCode().charAt(1), 10);
+      }
+
+      currentTaskSpec() {
+        return TASK_SPECS[this.currentTaskNumber()];
+      }
+
+      handleSend() {
+        const text = this.chatTextarea.value.trim();
+        if (!text || this.isWaiting) return;
+
+        this.chatMessages.push({
+          sender: "user",
+          text: text
+        });
+
+        this.chatTextarea.value = "";
+        this.sendBtn.disabled = true;
+        this.isWaiting = true;
+        this.setProcessStep(3); // Step 3: AI response
+        this.renderChat();
+
+        setTimeout(() => {
+          this.executeConditionResponse();
+        }, 1200);
+      }
+
+      executeConditionResponse() {
+        this.isWaiting = false;
+        const cond = this.currentCondition();
+        const tNum = this.currentTaskNumber();
+        const spec = this.currentTaskSpec();
+
+        if (cond === "A") {
+          // CONDITION A: AUTONOMOUS ASSUMPTION
+          let intro = "";
+          let title = "";
+          if (tNum === 1) {
+            intro = `December 2026 is a gorgeous time to visit London! 🎄 You'll get Christmas lights, festive markets, beautiful photo spots, shopping and iconic London attractions.
+
+I'd suggest a <strong>3-day, 2-night trip</strong>, travelling from Birmingham. That gives you enough time to explore without rushing.`;
+            title = "Your suggested London itinerary";
+          } else if (tNum === 2) {
+            intro = `Try a quick creamy chicken pasta with garlic and spinach.
+
+It should take about 25 minutes and serves two.
+
+Here is the complete recipe and preparation guide:`;
+            title = "Creamy Garlic Chicken & Spinach Pasta";
+          } else {
+            intro = `A simple starting approach is a 50/30/20 style budget.
+
+I’ll illustrate this using an assumed £2,000 monthly take-home pay with a typical £20,000 deposit goal:`;
+            title = "Standard 50/30/20 Allocation Plan";
+          }
+
+          this.chatMessages.push({
+            sender: "ai",
+            introText: intro,
+            itineraryTitle: title,
+            days: spec.daysA,
+            heroPhotos: tNum === 1 ? spec.heroPhotos : null,
+            showMap: tNum === 1,
+            isComplete: true
+          });
+          this.isDone = true;
+          this.lockChatInput();
+        } else if (cond === "B") {
+          // CONDITION B: SYSTEM-INITIATED CLARIFICATION
+          this.chatMessages.push({
+            sender: "ai",
+            introText: `Before I suggest a tailored plan, I need a few details to pick the best options:`,
+            isClarificationForm: true,
+            questions: spec.clarificationQuestions
+          });
+        } else if (cond === "C") {
+          // CONDITION C: GENERATE-AND-REFINE
+          let intro = "";
+          let title = "";
+          if (tNum === 1) {
+            intro = `December 2026 is a gorgeous time to visit London! 🎄 You'll get Christmas lights, festive markets, beautiful photo spots, shopping and iconic London attractions.
+
+I'd suggest a <strong>3-day, 2-night trip</strong>. That gives you enough time to explore without rushing.`;
+            title = "Your suggested London itinerary";
+          } else if (tNum === 2) {
+            intro = `A simple option is creamy chicken pasta with spinach. It should take around 25 minutes.`;
+            title = "Initial Suggested Recipe (Creamy Chicken Pasta)";
+          } else {
+            intro = `A useful starting approach is to divide your money into four areas:
+1. Essential expenses
+2. Flexible spending
+3. House-deposit savings
+4. Emergency buffer`;
+            title = "General 4-Pillar Budget Framework";
+          }
+
+          this.chatMessages.push({
+            sender: "ai",
+            introText: intro,
+            itineraryTitle: title,
+            days: spec.daysA,
+            heroPhotos: tNum === 1 ? spec.heroPhotos : null,
+            showMap: tNum === 1,
+            isRefinementForm: true,
+            questions: spec.clarificationQuestions
+          });
+        }
+
+        this.renderChat();
+      }
+
+      submitClarificationAnswers() {
+        this.isWaiting = true;
+        this.renderChat();
+
+        setTimeout(() => {
+          this.isWaiting = false;
+          const tNum = this.currentTaskNumber();
+          const spec = this.currentTaskSpec();
+
+          let intro = "";
+          let title = "";
+          if (tNum === 1) {
+            intro = `Based on your selections:
+
+• 2 nights stay for two
+• £350 budget
+• Focused on artisan food and historic markets with minimal transit
+
+Here is your custom itinerary:`;
+            title = "Tailored 3-Day London Food & Markets Itinerary";
+          } else if (tNum === 2) {
+            intro = `Great! You can make a quick vegetarian tomato and spinach pasta for two.
+
+It uses what you have on hand, takes just 20 minutes, and keeps dinner fresh and simple:`;
+            title = "20-Minute Vegetarian Garlic Tomato & Spinach Pasta";
+          } else {
+            intro = `Based on those figures, you have around £800 remaining after essential expenses.
+
+To reach £12,000 in 18 months, you would need to save approximately £667 per month:`;
+            title = "Tailored 18-Month Deposit Savings Plan";
+          }
+
+          this.chatMessages.push({
+            sender: "ai",
+            introText: intro,
+            itineraryTitle: title,
+            days: spec.daysTailored,
+            heroPhotos: tNum === 1 ? spec.heroPhotos : null,
+            showMap: tNum === 1,
+            isComplete: true
+          });
+          this.isDone = true;
+          this.lockChatInput();
+          this.renderChat();
+        }, 1300);
+      }
+
+      submitRefinementAnswers() {
+        this.isWaiting = true;
+        this.renderChat();
+
+        setTimeout(() => {
+          this.isWaiting = false;
+          const tNum = this.currentTaskNumber();
+          const spec = this.currentTaskSpec();
+
+          let intro = "";
+          let title = "";
+          if (tNum === 1) {
+            intro = `I have updated your itinerary based on your selections:
+
+Tailored for a 2-night stay with a focus on food markets and easy central walking routes.`;
+            title = "Revised Food & Markets Itinerary";
+          } else if (tNum === 2) {
+            intro = `Here is the revised meal:
+
+Quick vegetarian tomato and spinach pasta for two. Adjusted for a strict 20-minute cook time using your pantry ingredients.`;
+            title = "Revised Vegetarian Tomato & Spinach Pasta (20 Mins)";
+          } else {
+            intro = `Based on your figures:
+
+Monthly income: £2,200
+Essential expenses: £1,400
+Deposit target: £12,000
+Timeframe: 18 months
+
+You would need to save approximately £667 per month.`;
+            title = "Revised Personalised Deposit Savings Budget";
+          }
+
+          this.chatMessages.push({
+            sender: "ai",
+            introText: intro,
+            itineraryTitle: title,
+            days: spec.daysTailored,
+            heroPhotos: tNum === 1 ? spec.heroPhotos : null,
+            showMap: tNum === 1,
+            isComplete: true
+          });
+          this.isDone = true;
+          this.lockChatInput();
+          this.renderChat();
+        }, 1300);
+      }
+
+      lockChatInput() {
+        this.chatTextarea.disabled = true;
+        this.chatTextarea.placeholder = "Task complete. Interaction is closed.";
+        this.inputContainer.classList.add("disabled-locked");
+      }
+
+      renderChat() {
+        const spec = this.currentTaskSpec();
+        this.navbarPill.innerHTML = `<span>${spec.chatTitle || spec.title}</span>`;
+
+        if (this.chatMessages.length === 0) {
+          this.messagesInner.innerHTML = `
+            <div class="empty-state-view">
+              <div class="empty-hero-icon">✦</div>
+              <div class="empty-title">TaskGPT</div>
+              <div class="empty-subtitle">
+                Task ${this.currentTaskIdx + 1} of 3: ${spec.title}. Ready for your input.
+              </div>
+
+              <div class="prompt-launcher-card">
+                <div class="prompt-card-header">
+                  <span class="prompt-tag">Assigned Study Prompt</span>
+                </div>
+                <div class="prompt-content-quote">
+                  "${spec.prompt}"
+                </div>
+                <div class="prompt-card-actions">
+                  <button class="btn-primary" onclick="app.clickToInsertAndSend()">
+                    ⚡ Send Prompt
+                  </button>
+                  <button class="btn-subtle" onclick="app.startWithPrompt()">
+                    ✏️ Insert into Input
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        let html = "";
+        this.chatMessages.forEach(msg => {
+          if (msg.sender === "user") {
+            html += `
+              <div class="msg-row user">
+                <div class="msg-bubble">
+                  ${msg.text}
+                </div>
+              </div>
+            `;
+          } else {
+            html += `
+              <div class="msg-row ai">
+                <div class="msg-bubble">
+                  <!-- Thinking status -->
+                  <div class="thinking-pill">
+                    <span>Worked for 17s ></span>
+                  </div>
+
+                  <!-- AI Introductory text -->
+                  <div class="ai-intro-text">${msg.introText}</div>
+
+                  <!-- 3 Real Hero Photos (Straight line - Fix 1) -->
+                  ${msg.heroPhotos ? `
+                    <div class="straight-line-photos-grid">
+                      ${msg.heroPhotos.map(p => `
+                        <div class="straight-photo-card" title="${p.alt}">
+                          <img src="${p.src}" alt="${p.alt}" loading="lazy">
+                          ${p.badge ? `<div class="photo-badge-counter">🖼️ ${p.badge}</div>` : ''}
+                        </div>
+                      `).join("")}
+                    </div>
+                  ` : ''}
+
+                  <!-- Itinerary Title -->
+                  ${msg.itineraryTitle ? `<div class="section-title-heading">${msg.itineraryTitle}</div>` : ''}
+
+                  <!-- Day-by-Day schedule with left photo thumbnails (Fix 2) -->
+                  ${msg.days ? `
+                    <div class="day-by-day-list">
+                      ${msg.days.map(d => `
+                        <div class="day-schedule-card">
+                          <div class="day-thumbnail-wrap">
+                            <img src="${d.img}" alt="${d.day}" loading="lazy">
+                          </div>
+                          <div class="day-content-wrap">
+                            <div class="day-header-title">${d.day}</div>
+                            <div class="day-description-text">${d.desc}</div>
+                          </div>
+                        </div>
+                      `).join("")}
+                    </div>
+                  ` : ''}
+
+                  <!-- Interactive Map (Fix 3) -->
+                  ${msg.showMap ? `
+                    <div class="section-title-heading">Your London trip map</div>
+                    ${this.renderInteractiveMapHTML()}
+                  ` : ''}
+
+                  <!-- Condition B Clarification Questions Form -->
+                  ${msg.isClarificationForm ? this.renderClarificationFormHTML(msg.questions) : ''}
+
+                  <!-- Condition C Refinement Form -->
+                  ${msg.isRefinementForm ? this.renderRefinementFormHTML(msg.questions) : ''}
+
+                  <!-- Task Complete Banner -->
+                  ${msg.isComplete ? `
+                    <div class="task-complete-box">
+                      <div class="complete-header">
+                        <span>✓</span>
+                        <span>Task complete. Please continue to the questionnaire.</span>
+                      </div>
+                      <button class="btn-primary" style="width: fit-content;" onclick="app.showQuestionnaireModal()">
+                        Complete Post-Task Questionnaire →
+                      </button>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }
+        });
+
+        if (this.isWaiting) {
+          html += `
+            <div class="msg-row ai">
+              <div class="msg-bubble">
+                <div class="typing-container">
+                  <div class="dot"></div>
+                  <div class="dot"></div>
+                  <div class="dot"></div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        this.messagesInner.innerHTML = html;
+
+        setTimeout(() => {
+          this.messagesThread.scrollTop = this.messagesThread.scrollHeight;
+        }, 50);
+      }
+
+      renderClarificationFormHTML(questions) {
+        if (this.isDone) return "";
+        return `
+          <div class="structured-form-box">
+            <div class="form-heading-title">💬 Please Select Your Preferences</div>
+            <div class="form-heading-sub">Choose an option for each category so I can tailor the recommendations:</div>
+            ${questions.map(q => {
+              const sel = this.selectedOptions[q.id] || q.default;
+              return `
+                <div class="q-group">
+                  <div class="q-label">${q.label}</div>
+                  <div class="chip-grid">
+                    ${q.options.map(opt => `
+                      <button type="button" class="chip-btn ${opt === sel ? 'selected' : ''}" 
+                              onclick="app.selectChip('${q.id}', '${opt}')">
+                        ${opt}
+                      </button>
+                    `).join("")}
+                  </div>
+                </div>
+              `;
+            }).join("")}
+            <div class="form-submit-row">
+              <button class="btn-primary" onclick="app.submitClarificationAnswers()">
+                Send Answers & Generate Tailored Plan →
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      renderRefinementFormHTML(questions) {
+        if (this.isDone) return "";
+        return `
+          <div class="structured-form-box" style="border-color: rgba(124, 58, 237, 0.4);">
+            <div class="form-heading-title" style="color: #a78bfa;">✦ Make It Yours (Refine Options)</div>
+            <div class="form-heading-sub">Select your exact preferences below to immediately adjust and recalculate:</div>
+            ${questions.map(q => {
+              const sel = this.selectedOptions[q.id] || q.default;
+              return `
+                <div class="q-group">
+                  <div class="q-label">${q.label}</div>
+                  <div class="chip-grid">
+                    ${q.options.map(opt => `
+                      <button type="button" class="chip-btn ${opt === sel ? 'selected' : ''}" 
+                              onclick="app.selectChip('${q.id}', '${opt}')">
+                        ${opt}
+                      </button>
+                    `).join("")}
+                  </div>
+                </div>
+              `;
+            }).join("")}
+            <div class="form-submit-row">
+              <button class="btn-primary" onclick="app.submitRefinementAnswers()">
+                Update & Refine Recommendation →
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      selectChip(qId, val) {
+        this.selectedOptions[qId] = val;
+        this.renderChat();
+      }
+
+      startWithPrompt() {
+        const spec = this.currentTaskSpec();
+        this.chatTextarea.value = spec.prompt;
+        this.chatTextarea.focus();
+        this.sendBtn.disabled = false;
+      }
+
+      clickToInsertAndSend() {
+        const spec = this.currentTaskSpec();
+        this.chatTextarea.value = spec.prompt;
+        this.handleSend();
+      }
+
+      // Interactive Map HTML
+      renderInteractiveMapHTML() {
+        const stop = MAP_LOCATIONS[this.selectedMapStop] || MAP_LOCATIONS.westminster;
+        const showD1 = this.activeMapRoute === 'all' || this.activeMapRoute === 'day1';
+        const showD2 = this.activeMapRoute === 'all' || this.activeMapRoute === 'day2';
+        const showD3 = this.activeMapRoute === 'all' || this.activeMapRoute === 'day3';
+
+        return `
+          <div class="interactive-map-wrapper">
+            <div class="map-controls-bar">
+              <div class="map-route-tabs">
+                <button class="map-tab-btn ${this.activeMapRoute === 'all' ? 'active' : ''}" onclick="app.setMapRoute('all')">
+                  All groups ▾
+                </button>
+                <button class="map-tab-btn ${this.activeMapRoute === 'day1' ? 'active' : ''}" onclick="app.setMapRoute('day1')">
+                  🟡 Day 1: Iconic London
+                </button>
+                <button class="map-tab-btn ${this.activeMapRoute === 'day2' ? 'active' : ''}" onclick="app.setMapRoute('day2')">
+                  🔵 Day 2: Shopping & Christmas
+                </button>
+                <button class="map-tab-btn ${this.activeMapRoute === 'day3' ? 'active' : ''}" onclick="app.setMapRoute('day3')">
+                  🟢 Day 3: Markets & Sightseeing
+                </button>
+              </div>
+            </div>
+
+            <div class="map-canvas-area" id="map-canvas-container">
+              <svg class="map-svg-overlay" viewBox="0 0 1900 980" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Glowing Animated Connecting Routes -->
+                ${showD1 ? `
+                  <path d="M 780,770 Q 840,750 900,720 T 960,600" class="route-path-line route-day1"/>
+                ` : ''}
+
+                ${showD2 ? `
+                  <path d="M 110,620 Q 250,470 400,320 T 650,470 Q 730,440 820,415" class="route-path-line route-day2"/>
+                ` : ''}
+
+                ${showD3 ? `
+                  <path d="M 1480,640 Q 1630,640 1780,640" class="route-path-line route-day3"/>
+                ` : ''}
+
+                <!-- Clickable Interactive Hotspots -->
+                ${Object.values(MAP_LOCATIONS).map(loc => {
+                  const isSel = this.selectedMapStop === loc.id;
+                  const isDayMatch = (this.activeMapRoute === 'all') ||
+                                     (this.activeMapRoute === 'day1' && loc.day === 'Day 1') ||
+                                     (this.activeMapRoute === 'day2' && loc.day === 'Day 2') ||
+                                     (this.activeMapRoute === 'day3' && loc.day === 'Day 3');
+
+                  const pinColor = loc.day === 'Day 1' ? '#fbbf24' : loc.day === 'Day 2' ? '#38bdf8' : '#10b981';
+
+                  return `
+                    <g class="map-hotspot" opacity="${isDayMatch ? '1' : '0.25'}" onclick="app.selectMapStop('${loc.id}')">
+                      <circle cx="${loc.x}" cy="${loc.y}" r="${isSel ? '34' : '22'}" fill="${pinColor}" opacity="${isSel ? '0.35' : '0.1'}"/>
+                      <circle cx="${loc.x}" cy="${loc.y}" r="${isSel ? '22' : '16'}" fill="#18181b" stroke="${pinColor}" stroke-width="${isSel ? '3.5' : '2'}"/>
+                      <text x="${loc.x}" y="${loc.y + 6}" text-anchor="middle" font-size="${isSel ? '16' : '13'}">${loc.icon}</text>
+                    </g>
+                  `;
+                }).join("")}
+              </svg>
+
+              <!-- Floating Info Card -->
+              <div class="map-info-floating-card">
+                <div class="info-card-left">
+                  <div class="info-stop-title">
+                    <span>${stop.icon}</span>
+                    <span>${stop.name}</span>
+                    <span style="font-size: 11px; font-weight: 600; color: #a78bfa; margin-left: 4px;">(${stop.day})</span>
+                  </div>
+                  <div class="info-stop-desc">${stop.desc}</div>
+                </div>
+                <div class="info-transit-badge">
+                  📍 Click pins or tabs to inspect
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      setMapRoute(routeKey) {
+        this.activeMapRoute = routeKey;
+        if (routeKey === 'day1') this.selectedMapStop = 'westminster';
+        if (routeKey === 'day2') this.selectedMapStop = 'covent';
+        if (routeKey === 'day3') this.selectedMapStop = 'borough';
+        this.renderChat();
+      }
+
+      selectMapStop(stopKey) {
+        this.selectedMapStop = stopKey;
+        this.renderChat();
+        const stop = MAP_LOCATIONS[stopKey];
+        if (stop) {
+          this.showToast(`Selected: ${stop.name} (${stop.day})`);
+        }
+      }
+
+      // Step 4: Questionnaire Modal (Glitch-free, no shaking)
+      showQuestionnaireModal() {
+        this.setProcessStep(4); // Step 4: Post-task questionnaire
+        const spec = this.currentTaskSpec();
+
+        const questionsHtml = LIKERT_QUESTIONS.map((q, qIdx) => {
+          const optionsHtml = [1, 2, 3, 4, 5, 6, 7].map(num => `
+            <div class="likert-cell ${this.ratings[qIdx] === num ? 'selected' : ''}" 
+                 onclick="app.selectLikert(${qIdx}, ${num})">
+              <span class="likert-cell-num">${num}</span>
+              <span class="likert-cell-label">${num === 1 ? 'Strongly<br>disagree' : num === 7 ? 'Strongly<br>agree' : num === 4 ? 'Neutral' : ''}</span>
+            </div>
+          `).join("");
+
+          return `
+            <div class="likert-block">
+              <div class="likert-question-text">${qIdx + 1}. “${q}”</div>
+              <div class="likert-numbers-row" id="likert-row-${qIdx}">
+                ${optionsHtml}
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        this.modalLayer.innerHTML = `
+          <div class="modal-backdrop">
+            <div class="modal-card">
+              <div class="modal-title">Task ${this.currentTaskIdx + 1} Feedback</div>
+              <div class="modal-sub">
+                Please rate your experience with TaskGPT for <strong>Task ${this.currentTaskIdx + 1}: ${spec.title}</strong> (1 = Strongly Disagree, 7 = Strongly Agree):
+              </div>
+
+              <div style="max-height: 52vh; overflow-y: auto; padding-right: 6px;">
+                ${questionsHtml}
+              </div>
+
+              <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                <button class="btn-primary" onclick="app.submitQuestionnaire()">
+                  Submit Feedback & Continue →
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // Direct DOM update: ZERO modal re-renders, ZERO animation re-triggers, ZERO shake!
+      selectLikert(qIdx, val) {
+        this.ratings[qIdx] = val;
+        const row = document.getElementById(`likert-row-${qIdx}`);
+        if (row) {
+          const cells = row.querySelectorAll('.likert-cell');
+          cells.forEach((cell, idx) => {
+            if (idx + 1 === val) {
+              cell.classList.add('selected');
+            } else {
+              cell.classList.remove('selected');
+            }
+          });
+        }
+      }
+
+      submitQuestionnaire() {
+        const allAnswered = this.ratings.every(r => r !== null);
+        if (!allAnswered) {
+          alert("Please answer all 4 rating questions before continuing.");
+          return;
+        }
+
+        const endTime = new Date();
+        const start = this.taskStartTime || new Date(endTime.getTime() - 45000);
+        const durationSec = Math.max(1, Math.round((endTime.getTime() - start.getTime()) / 1000));
+        const durationFmt = this.formatDuration(durationSec);
+
+        this.recordTaskCompletionData(durationSec, durationFmt, this.ratings);
+
+        this.completedTasks[this.currentTaskIdx] = true;
+        this.modalLayer.innerHTML = "";
+
+        const allCompleted = this.completedTasks.every(d => d === true);
+
+        if (allCompleted) {
+          this.showStudyCompleteModal();
+        } else {
+          const nextIdx = (this.currentTaskIdx + 1) % 3;
+          this.loadTask(nextIdx);
+          this.showToast(`Task ${this.currentTaskIdx} completed! Ready for Task ${this.currentTaskIdx + 1}.`);
+        }
+      }
+
+      formatDuration(sec) {
+        if (!sec || isNaN(sec) || sec <= 0) return "0s";
+        const total = Math.round(sec);
+        const m = Math.floor(total / 60);
+        const s = total % 60;
+        if (m > 0) {
+          return `${m}m ${s < 10 ? '0' : ''}${s}s`;
+        }
+        return `${s}s`;
+      }
+
+      recordTaskCompletionData(durationSec, durationFmt, ratings) {
+        const payload = {
+          participant_code: this.participantCode,
+          sequence: this.seqInfo.seqKey,
+          task_order: this.currentTaskIdx + 1,
+          task_code: this.currentTaskCode(),
+          task_name: this.currentTaskSpec().taskName,
+          condition: this.currentCondition(),
+          start_time: (this.taskStartTime || new Date()).toISOString(),
+          end_time: new Date().toISOString(),
+          duration_seconds: durationSec,
+          duration_formatted: durationFmt,
+          ratings: ratings,
+          selected_options: this.selectedOptions
+        };
+
+        fetch("/api/record_task_time", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(err => console.warn("API save warning", err));
+
+        // Direct cloud sync fallback (ensures cross-device linking on Vercel)
+        try {
+          fetch("https://kvdb.io/K9mTaskGPTStudy2026/study_dataset_v1", {
+            headers: { "Accept": "application/json" }
+          }).then(function(res) { return res.json(); }).then(function(data) {
+            if (!data || !Array.isArray(data.summaries)) data = { summaries: [], tasks: [] };
+            data.tasks = data.tasks || [];
+            data.summaries = data.summaries || [];
+            data.tasks.push(payload);
+
+            var summary = data.summaries.find(function(s) { return s.participant_code === payload.participant_code; });
+            if (!summary) {
+              summary = {
+                participant_code: payload.participant_code,
+                sequence: payload.sequence,
+                task1_code: "T1", task1_duration: 0, task1_formatted: "",
+                task2_code: "T2", task2_duration: 0, task2_formatted: "",
+                task3_code: "T3", task3_duration: 0, task3_formatted: "",
+                total_duration_seconds: 0, total_duration_formatted: "0s",
+                is_completed: 0, last_updated: new Date().toISOString()
+              };
+              data.summaries.push(summary);
+            }
+
+            if (payload.task_order === 1) {
+              summary.task1_code = payload.task_code;
+              summary.task1_duration = payload.duration_seconds;
+              summary.task1_formatted = payload.duration_formatted;
+            } else if (payload.task_order === 2) {
+              summary.task2_code = payload.task_code;
+              summary.task2_duration = payload.duration_seconds;
+              summary.task2_formatted = payload.duration_formatted;
+            } else if (payload.task_order === 3) {
+              summary.task3_code = payload.task_code;
+              summary.task3_duration = payload.duration_seconds;
+              summary.task3_formatted = payload.duration_formatted;
+            }
+
+            var t1 = summary.task1_duration || 0;
+            var t2 = summary.task2_duration || 0;
+            var t3 = summary.task3_duration || 0;
+            summary.total_duration_seconds = t1 + t2 + t3;
+            var m = Math.floor(summary.total_duration_seconds / 60);
+            var s = Math.round(summary.total_duration_seconds % 60);
+            summary.total_duration_formatted = m > 0 ? (m + "m " + (s < 10 ? "0" : "") + s + "s") : (s + "s");
+            summary.is_completed = (t1 > 0 && t2 > 0 && t3 > 0) ? 1 : 0;
+            summary.last_updated = new Date().toISOString();
+
+            fetch("https://kvdb.io/K9mTaskGPTStudy2026/study_dataset_v1", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data)
+            }).catch(function() {});
+          }).catch(function() {});
+        } catch (e) {}
+
+        try {
+          const recs = JSON.parse(localStorage.getItem("admin_recorded_tasks") || "[]");
+          recs.push(payload);
+          localStorage.setItem("admin_recorded_tasks", JSON.stringify(recs));
+        } catch(e) {}
+      }
+
+      showStudyCompleteModal() {
+        this.updateSidebarUI();
+        this.modalLayer.innerHTML = `
+          <div class="modal-backdrop">
+            <div class="modal-card" style="text-align: center; max-width: 480px; padding: 36px 28px;">
+              <div style="font-size: 54px; margin-bottom: 16px;">🎉</div>
+              <div class="modal-title" style="font-size: 22px; margin-bottom: 12px;">
+                Thank you for participating in this task.
+              </div>
+              <div class="modal-sub" style="margin-bottom: 24px; font-size: 14px;">
+                All three tasks have been successfully completed and recorded.
+              </div>
+              <button class="btn-primary" onclick="app.closeAndResetStudySession()">
+                Close
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      closeAndResetStudySession() {
+        this.participantCode = "";
+        this.completedTasks = [false, false, false];
+        this.modalLayer.innerHTML = "";
+        this.showCodeEntryModal();
+      }
+
+      showCodeEntryModal() {
+        this.modalLayer.innerHTML = `
+          <div class="modal-backdrop">
+            <div class="modal-card" style="max-width: 440px; text-align: center;">
+              <div class="modal-title">Welcome to TaskGPT</div>
+              <div class="modal-sub">
+                Please enter your assigned Participant Code (e.g., <strong>P01</strong> to <strong>P24</strong>) to begin:
+              </div>
+              <form onsubmit="event.preventDefault(); app.submitCodeEntry();">
+                <input type="text" id="participant-code-input" class="code-input-field" 
+                       placeholder="P01" maxlength="6" autofocus>
+                <button type="submit" class="btn-primary" style="width: 100%;">
+                  Start Tasks →
+                </button>
+              </form>
+            </div>
+          </div>
+        `;
+        setTimeout(() => {
+          const inp = document.getElementById("participant-code-input");
+          if (inp) inp.focus();
+        }, 50);
+      }
+
+      submitCodeEntry() {
+        const inp = document.getElementById("participant-code-input");
+        const val = inp ? inp.value.trim().toUpperCase() : "";
+        if (!val) {
+          alert("Please enter a valid participant code (e.g. P01).");
+          return;
+        }
+
+        this.participantCode = val;
+        this.seqInfo = resolveSequenceForParticipant(val);
+        this.completedTasks = [false, false, false];
+
+        this.modalLayer.innerHTML = "";
+        this.setProcessStep(1); // Step 1: Task briefing
+        this.updateSidebarUI();
+        this.showBriefingModal();
+      }
+
+      showBriefingModal() {
+        this.setProcessStep(1); // Step 1: Task briefing
+        const spec = this.currentTaskSpec();
+        this.modalLayer.innerHTML = `
+          <div class="modal-backdrop" onclick="if(event.target === this) app.closeBriefingAndStart()">
+            <div class="modal-card">
+              <div class="modal-title">Task ${this.currentTaskIdx + 1}: ${spec.title}</div>
+              <div class="modal-sub">Scenario Context:</div>
+              <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 18px; margin-bottom: 22px; font-size: 14.5px; line-height: 1.65; color: #ececec;">
+                ${spec.scenario}
+              </div>
+              <div style="display: flex; justify-content: flex-end;">
+                <button class="btn-primary" onclick="app.closeBriefingAndStart()">
+                  Start Task →
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      closeBriefingAndStart() {
+        this.modalLayer.innerHTML = "";
+        this.setProcessStep(2); // Step 2: Enter chat and prompt
+        if (this.chatMessages.length === 0) {
+          this.loadTask(this.currentTaskIdx);
+        }
+      }
+
+      showToast(msg) {
+        const existing = document.querySelector(".toast-popup");
+        if (existing) existing.remove();
+
+        const toast = document.createElement("div");
+        toast.className = "toast-popup";
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+          toast.remove();
+        }, 2600);
+      }
+    }
+
+    // Initialize App
+    let app;
+    window.addEventListener("DOMContentLoaded", () => {
+      app = new TaskGPTApp();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskGPT Admin - Participant Time Tracking</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <style>
+    :root {
+      --bg-dark: #09090b;
+      --bg-card: #18181b;
+      --bg-card-hover: #222226;
+      --border: rgba(255, 255, 255, 0.1);
+      --accent-purple: #7c3aed;
+      --accent-purple-hover: #6d28d9;
+      --accent-emerald: #10b981;
+      --accent-blue: #38bdf8;
+      --accent-amber: #f59e0b;
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 28px;
+    }
+
+    .container {
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+
+    /* Top Bar */
+    .admin-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
+    }
+
+    .title-text h1 {
+      font-size: 21px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-text p {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      border: 1px solid transparent;
+    }
+
+    .btn-primary {
+      background: var(--accent-purple);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
+    }
+    .btn-primary:hover {
+      background: var(--accent-purple-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--border);
+      color: #e4e4e7;
+    }
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #f87171;
+    }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    /* Summary Stats Cards */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .stat-card:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .stat-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-num {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+      font-family: monospace;
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: #71717a;
+      margin-top: 4px;
+    }
+
+    /* Main Table Container */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .table-top-bar {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .table-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .live-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--accent-emerald);
+      font-weight: 500;
+    }
+
+    .pulsing-circle {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+
+    .table-responsive {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 14px 18px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 13.5px;
+      color: var(--text-main);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    .badge-code {
+      background: rgba(124, 58, 237, 0.15);
+      border: 1px solid rgba(124, 58, 237, 0.35);
+      color: #c084fc;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .badge-seq {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e4e4e7;
+    }
+
+    /* Task Time Badges */
+    .time-cell-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .time-val-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 14.5px;
+      font-weight: 700;
+      font-family: monospace;
+    }
+
+    .time-val-badge.completed-time {
+      color: #34d399;
+    }
+
+    .time-val-badge.pending-time {
+      color: #71717a;
+      font-weight: 500;
+      font-size: 12px;
+    }
+
+    .task-code-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .total-time-badge {
+      font-size: 15px;
+      font-weight: 700;
+      color: #c084fc;
+      font-family: monospace;
+      background: rgba(124, 58, 237, 0.12);
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      padding: 5px 12px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+
+    .badge-status-completed {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    .badge-status-progress {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+
+    .empty-row {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Floating Toast */
+    .toast-msg {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #27272a;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      z-index: 100;
+      animation: toastIn 0.2s ease-out;
+    }
+
+    @keyframes toastIn {
+      from { transform: translateY(10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="admin-header">
+      <div class="logo-badge">
+        <div class="logo-icon">📊</div>
+        <div class="title-text">
+          <h1>TaskGPT Research Study Admin</h1>
+          <p>Participant Time Tracking, Task Durations & Data Export</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a href="/" class="btn btn-outline" style="text-decoration: none;" title="Open participant chat app">
+          👤 Participant App ↗
+        </a>
+        <button class="btn btn-outline" id="refresh-btn" onclick="adminApp.loadData()">
+          🔄 Refresh
+        </button>
+        <button class="btn btn-primary" id="export-csv-btn" onclick="adminApp.exportCSV()">
+          📥 Export CSV
+        </button>
+        <button class="btn btn-danger" id="clear-data-btn" onclick="adminApp.clearData()">
+          ⚠️ Clear All Data
+        </button>
+      </div>
+    </header>
+
+    <!-- Stats Summary Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Participants</div>
+        <div class="stat-num" id="stat-total-p">0</div>
+        <div class="stat-sub">Active sessions recorded</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Completed (3/3 Tasks)</div>
+        <div class="stat-num" id="stat-completed-p" style="color: #34d399;">0</div>
+        <div class="stat-sub">All 3 study tasks finished</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Time Per Task</div>
+        <div class="stat-num" id="stat-avg-task" style="color: #38bdf8;">0s</div>
+        <div class="stat-sub">Across all completed tasks</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Total Study Time</div>
+        <div class="stat-num" id="stat-avg-total" style="color: #c084fc;">0s</div>
+        <div class="stat-sub">Full session per participant</div>
+      </div>
+    </div>
+
+    <!-- Live Records Table -->
+    <div class="table-container">
+      <div class="table-top-bar">
+        <div class="table-title">Participant Time Tracking Log</div>
+        <div class="live-dot">
+          <div class="pulsing-circle"></div>
+          <span>Live Auto-Sync (Every 3s)</span>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Participant</th>
+              <th>Sequence Order</th>
+              <th>Task 1 Time</th>
+              <th>Task 2 Time</th>
+              <th>Task 3 Time</th>
+              <th>Total Duration</th>
+              <th>Status</th>
+              <th>Last Active</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr>
+              <td colspan="8" class="empty-row">Loading participant records...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class AdminApp {
+      constructor() {
+        this.records = [];
+        this.rawTasks = [];
+        this.loadData();
+        // Auto refresh every 3 seconds
+        setInterval(() => this.loadData(true), 3000);
+      }
+
+      showToast(msg) {
+        const existing = document.querySelector(".toast-msg");
+        if (existing) existing.remove();
+
+        const t = document.createElement("div");
+        t.className = "toast-msg";
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2500);
+      }
+
+      fmtDuration(sec) {
+        if (sec === undefined || sec === null || isNaN(sec) || sec <= 0) return null;
+        const total = Math.round(sec);
+        const m = Math.floor(total / 60);
+        const s = total % 60;
+        if (m > 0) {
+          return m + "m " + (s < 10 ? "0" : "") + s + "s";
+        }
+        return s + "s";
+      }
+
+      async loadData(isBackground) {
+        let serverData = null;
+        try {
+          const res = await fetch("/api/study_records");
+          if (res.ok) {
+            serverData = await res.json();
+          }
+        } catch (e) {
+          // Fallback to cloud direct or localStorage
+        }
+
+        // If server API wasn't reachable or returned empty summaries, check cloud KV sync
+        if (!serverData || !serverData.summaries || serverData.summaries.length === 0) {
+          try {
+            const cloudRes = await fetch("https://kvdb.io/K9mTaskGPTStudy2026/study_dataset_v1", {
+              headers: { "Accept": "application/json" }
+            });
+            if (cloudRes.ok) {
+              const text = await cloudRes.text();
+              if (text && text.trim().startsWith("{")) {
+                const cloudJson = JSON.parse(text);
+                if (cloudJson && Array.isArray(cloudJson.summaries) && cloudJson.summaries.length > 0) {
+                  serverData = cloudJson;
+                }
+              }
+            }
+          } catch(e) {}
+        }
+
+        const localTasks = JSON.parse(localStorage.getItem("admin_recorded_tasks") || "[]");
+
+        if (serverData && serverData.summaries && serverData.summaries.length > 0) {
+          this.records = this.normalizeServerSummaries(serverData.summaries);
+          this.rawTasks = serverData.tasks || [];
+        } else if (localTasks.length > 0) {
+          this.rawTasks = localTasks;
+          this.records = this.aggregateLocalTasks(localTasks);
+        } else {
+          this.records = [];
+          this.rawTasks = [];
+        }
+
+        this.renderTable();
+        this.renderStats();
+
+        if (!isBackground) {
+          this.showToast("Data refreshed.");
+        }
+      }
+
+      normalizeServerSummaries(summaries) {
+        const self = this;
+        return summaries.map(function(s) {
+          const t1Sec = s.task1_duration || 0;
+          const t2Sec = s.task2_duration || 0;
+          const t3Sec = s.task3_duration || 0;
+          const totSec = s.total_duration_seconds || (t1Sec + t2Sec + t3Sec);
+
+          let compCount = 0;
+          if (t1Sec > 0) compCount++;
+          if (t2Sec > 0) compCount++;
+          if (t3Sec > 0) compCount++;
+
+          const isCompleted = s.is_completed === 1 || compCount === 3;
+
+          return {
+            participant_code: s.participant_code,
+            sequence: s.sequence || "S1",
+            task1_code: s.task1_code || "T1",
+            task1_duration: t1Sec,
+            task1_formatted: s.task1_formatted || self.fmtDuration(t1Sec),
+            task2_code: s.task2_code || "T2",
+            task2_duration: t2Sec,
+            task2_formatted: s.task2_formatted || self.fmtDuration(t2Sec),
+            task3_code: s.task3_code || "T3",
+            task3_duration: t3Sec,
+            task3_formatted: s.task3_formatted || self.fmtDuration(t3Sec),
+            total_duration_seconds: totSec,
+            total_duration_formatted: s.total_duration_formatted || self.fmtDuration(totSec) || "0s",
+            is_completed: isCompleted ? 1 : 0,
+            completed_count: compCount,
+            last_updated: s.last_updated || "-"
+          };
+        });
+      }
+
+      aggregateLocalTasks(tasks) {
+        const self = this;
+        const map = {};
+        tasks.forEach(function(t) {
+          const p = (t.participant_code || "P01").toUpperCase().trim();
+          if (!map[p]) {
+            map[p] = {
+              participant_code: p,
+              sequence: t.sequence || "S1",
+              task1_code: "T1", task1_duration: 0, task1_formatted: null,
+              task2_code: "T2", task2_duration: 0, task2_formatted: null,
+              task3_code: "T3", task3_duration: 0, task3_formatted: null,
+              total_duration_seconds: 0, total_duration_formatted: "0s",
+              is_completed: 0, completed_count: 0, last_updated: t.end_time || "-"
+            };
+          }
+
+          const dur = parseFloat(t.duration_seconds || 0);
+          const durFmt = t.duration_formatted || self.fmtDuration(dur);
+
+          if (t.task_order === 1) {
+            map[p].task1_code = t.task_code || "T1";
+            map[p].task1_duration = dur;
+            map[p].task1_formatted = durFmt;
+          } else if (t.task_order === 2) {
+            map[p].task2_code = t.task_code || "T2";
+            map[p].task2_duration = dur;
+            map[p].task2_formatted = durFmt;
+          } else if (t.task_order === 3) {
+            map[p].task3_code = t.task_code || "T3";
+            map[p].task3_duration = dur;
+            map[p].task3_formatted = durFmt;
+          }
+
+          let compCount = 0;
+          if (map[p].task1_duration > 0) compCount++;
+          if (map[p].task2_duration > 0) compCount++;
+          if (map[p].task3_duration > 0) compCount++;
+
+          map[p].completed_count = compCount;
+          map[p].is_completed = compCount === 3 ? 1 : 0;
+
+          const tot = (map[p].task1_duration || 0) + (map[p].task2_duration || 0) + (map[p].task3_duration || 0);
+          map[p].total_duration_seconds = tot;
+          map[p].total_duration_formatted = self.fmtDuration(tot) || "0s";
+          map[p].last_updated = t.end_time || map[p].last_updated;
+        });
+        return Object.values(map);
+      }
+
+      renderStats() {
+        const totalP = this.records.length;
+        const compP = this.records.filter(function(r) { return r.is_completed === 1; }).length;
+
+        let totalTaskSecs = 0;
+        let totalTaskCount = 0;
+        let totalStudySecs = 0;
+
+        this.records.forEach(function(r) {
+          if (r.task1_duration > 0) { totalTaskSecs += r.task1_duration; totalTaskCount++; }
+          if (r.task2_duration > 0) { totalTaskSecs += r.task2_duration; totalTaskCount++; }
+          if (r.task3_duration > 0) { totalTaskSecs += r.task3_duration; totalTaskCount++; }
+          if (r.total_duration_seconds > 0) { totalStudySecs += r.total_duration_seconds; }
+        });
+
+        const avgTask = totalTaskCount > 0 ? Math.round(totalTaskSecs / totalTaskCount) : 0;
+        const avgTotal = totalP > 0 ? Math.round(totalStudySecs / totalP) : 0;
+
+        document.getElementById("stat-total-p").textContent = String(totalP);
+        document.getElementById("stat-completed-p").textContent = String(compP);
+        document.getElementById("stat-avg-task").textContent = this.fmtDuration(avgTask) || "0s";
+        document.getElementById("stat-avg-total").textContent = this.fmtDuration(avgTotal) || "0s";
+      }
+
+      renderTable() {
+        const tbody = document.getElementById("table-body");
+        if (!tbody) return;
+
+        if (this.records.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="empty-row">No participant sessions recorded yet.<br><span style="font-size: 12px; color: #71717a;">Participants will appear here automatically when they enter their code and complete tasks.</span></td></tr>';
+          return;
+        }
+
+        const self = this;
+        tbody.innerHTML = this.records.map(function(r) {
+          const isComp = r.is_completed === 1;
+          const statusBadge = isComp 
+            ? '<span class="badge badge-status-completed">✓ Completed (3/3)</span>' 
+            : '<span class="badge badge-status-progress">In Progress (' + (r.completed_count || 0) + '/3)</span>';
+
+          const t1Display = r.task1_duration > 0
+            ? '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task1_formatted || self.fmtDuration(r.task1_duration)) + '</span><span class="task-code-meta">' + r.task1_code + '</span></div>'
+            : '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task1_code + '</span></div>';
+
+          const t2Display = r.task2_duration > 0
+            ? '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task2_formatted || self.fmtDuration(r.task2_duration)) + '</span><span class="task-code-meta">' + r.task2_code + '</span></div>'
+            : '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task2_code + '</span></div>';
+
+          const t3Display = r.task3_duration > 0
+            ? '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task3_formatted || self.fmtDuration(r.task3_duration)) + '</span><span class="task-code-meta">' + r.task3_code + '</span></div>'
+            : '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task3_code + '</span></div>';
+
+          const updatedStr = r.last_updated && r.last_updated !== "-"
+            ? r.last_updated.replace("T", " ").substring(0, 19)
+            : "-";
+
+          return '<tr>' +
+            '<td><span class="badge badge-code">' + r.participant_code + '</span></td>' +
+            '<td><span class="badge badge-seq">' + (r.sequence || 'S1') + '</span></td>' +
+            '<td>' + t1Display + '</td>' +
+            '<td>' + t2Display + '</td>' +
+            '<td>' + t3Display + '</td>' +
+            '<td><span class="total-time-badge">' + (r.total_duration_formatted || self.fmtDuration(r.total_duration_seconds) || '0s') + '</span></td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td style="color: #71717a; font-size: 12px; font-family: monospace;">' + updatedStr + '</td>' +
+            '</tr>';
+        }).join("");
+      }
+
+      exportCSV() {
+        if (this.records.length === 0) {
+          alert("No participant records to export yet. Complete study tasks first.");
+          return;
+        }
+
+        const self = this;
+        const headers = [
+          "Participant Code",
+          "Sequence",
+          "Task 1 Code",
+          "Task 1 Time (Seconds)",
+          "Task 1 Time (Formatted)",
+          "Task 2 Code",
+          "Task 2 Time (Seconds)",
+          "Task 2 Time (Formatted)",
+          "Task 3 Code",
+          "Task 3 Time (Seconds)",
+          "Task 3 Time (Formatted)",
+          "Total Study Duration (Seconds)",
+          "Total Study Duration (Formatted)",
+          "Status",
+          "Last Active Timestamp"
+        ];
+
+        const rows = this.records.map(function(r) {
+          return [
+            r.participant_code,
+            r.sequence,
+            r.task1_code,
+            r.task1_duration || 0,
+            '"' + (r.task1_formatted || self.fmtDuration(r.task1_duration) || '-') + '"',
+            r.task2_code,
+            r.task2_duration || 0,
+            '"' + (r.task2_formatted || self.fmtDuration(r.task2_duration) || '-') + '"',
+            r.task3_code,
+            r.task3_duration || 0,
+            '"' + (r.task3_formatted || self.fmtDuration(r.task3_duration) || '-') + '"',
+            r.total_duration_seconds || 0,
+            '"' + (r.total_duration_formatted || self.fmtDuration(r.total_duration_seconds) || '0s') + '"',
+            '"' + (r.is_completed === 1 ? 'Completed (3/3)' : 'In Progress') + '"',
+            '"' + (r.last_updated || '-') + '"'
+          ];
+        });
+
+        const csvRows = [headers.join(",")];
+        rows.forEach(function(row) {
+          csvRows.push(row.join(","));
+        });
+
+        const csvContent = csvRows.join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", "taskgpt_study_time_tracking_" + new Date().toISOString().slice(0, 10) + ".csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        this.showToast("CSV export downloaded successfully!");
+      }
+
+      async clearData() {
+        if (!confirm("Are you sure you want to clear all participant records? This will delete all tracked times so you can run fresh study sessions.")) {
+          return;
+        }
+
+        try {
+          await fetch("/api/clear_data", { method: "POST" });
+        } catch (e) {
+          // ignore
+        }
+
+        try {
+          await fetch("https://kvdb.io/K9mTaskGPTStudy2026/study_dataset_v1", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ summaries: [], tasks: [] })
+          });
+        } catch (e) {
+          // ignore
+        }
+
+        localStorage.removeItem("admin_recorded_tasks");
+        localStorage.removeItem("study_participant_code");
+        localStorage.removeItem("study_completed_tasks");
+
+        this.records = [];
+        this.rawTasks = [];
+        this.renderTable();
+        this.renderStats();
+        this.showToast("All study data cleared successfully.");
+      }
+    }
+
+    let adminApp;
+    window.addEventListener("DOMContentLoaded", function() {
+      adminApp = new AdminApp();
+    });
+    // In case DOM is already loaded
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+      if (!adminApp) adminApp = new AdminApp();
+    }
+  </script>
+</body>
+</html>
