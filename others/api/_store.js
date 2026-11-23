@@ -6,24 +6,31 @@
 
 const SEQUENCES = {
   S1: ["A1", "B2", "C3"],
-  S2: ["B3", "C1", "A2"],
-  S3: ["C2", "A3", "B1"],
-  S4: ["C3", "B2", "A1"],
+  S2: ["A2", "B3", "C1"],
+  S3: ["A3", "B1", "C2"],
+  S4: ["A1", "C3", "B2"],
   S5: ["A2", "C1", "B3"],
-  S6: ["B1", "A3", "C2"]
+  S6: ["A3", "C2", "B1"],
+  S7: ["B2", "A1", "C3"],
+  S8: ["B3", "A2", "C1"],
+  S9: ["B1", "A3", "C2"],
+  S10: ["B2", "C3", "A1"],
+  S11: ["B3", "C1", "A2"],
+  S12: ["B1", "C2", "A3"],
+  S13: ["C3", "A1", "B2"],
+  S14: ["C1", "A2", "B3"],
+  S15: ["C2", "A3", "B1"],
+  S16: ["C3", "B2", "A1"],
+  S17: ["C1", "B3", "A2"],
+  S18: ["C2", "B1", "A3"]
 };
 
 function getSequenceForCode(code) {
   if (!code) return "S1";
   const num = parseInt(code.replace(/\D/g, ""), 10);
-  if (isNaN(num)) return "S1";
-  if (num >= 1 && num <= 4) return "S1";
-  if (num >= 5 && num <= 8) return "S2";
-  if (num >= 9 && num <= 12) return "S3";
-  if (num >= 13 && num <= 16) return "S4";
-  if (num >= 17 && num <= 20) return "S5";
-  if (num >= 21 && num <= 24) return "S6";
-  return "S1";
+  if (isNaN(num) || num < 1) return "S1";
+  const boundedNum = Math.min(Math.max(num, 1), 18);
+  return `S${boundedNum}`;
 }
 
 function formatDuration(sec) {
@@ -217,7 +224,7 @@ async function recordTaskTime(payload) {
   summary.is_completed = (t1 > 0 && t2 > 0 && t3 > 0) ? 1 : 0;
   summary.last_updated = new Date().toISOString();
 
-  // Sort summaries P01..P24
+  // Sort summaries P01..P18
   summaries.sort((a, b) => a.participant_code.localeCompare(b.participant_code, undefined, { numeric: true }));
 
   await writeToStorage({ summaries, tasks });

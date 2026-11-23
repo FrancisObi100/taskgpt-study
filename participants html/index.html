@@ -1209,7 +1209,7 @@
           </div>
         </div>
 
-        <!-- 1. Participant Number (P01 to P24) -->
+        <!-- 1. Participant Number (P01 to P18) -->
         <div class="code-display-card">
           <span class="code-label">Participant:</span>
           <span class="code-val" id="sidebar-participant-code">Not set</span>
@@ -1392,14 +1392,26 @@
       }
     };
 
-    // 2. Exact Latin-Square Sequences
+    // 2. Exact Counterbalanced Sequences (S1 to S18 for P01 to P18)
     const SEQUENCES = {
       S1: ["A1", "B2", "C3"],
-      S2: ["B3", "C1", "A2"],
-      S3: ["C2", "A3", "B1"],
-      S4: ["C3", "B2", "A1"],
+      S2: ["A2", "B3", "C1"],
+      S3: ["A3", "B1", "C2"],
+      S4: ["A1", "C3", "B2"],
       S5: ["A2", "C1", "B3"],
-      S6: ["B1", "A3", "C2"]
+      S6: ["A3", "C2", "B1"],
+      S7: ["B2", "A1", "C3"],
+      S8: ["B3", "A2", "C1"],
+      S9: ["B1", "A3", "C2"],
+      S10: ["B2", "C3", "A1"],
+      S11: ["B3", "C1", "A2"],
+      S12: ["B1", "C2", "A3"],
+      S13: ["C3", "A1", "B2"],
+      S14: ["C1", "A2", "B3"],
+      S15: ["C2", "A3", "B1"],
+      S16: ["C3", "B2", "A1"],
+      S17: ["C1", "B3", "A2"],
+      S18: ["C2", "B1", "A3"]
     };
 
     function resolveSequenceForParticipant(code) {
@@ -1408,18 +1420,16 @@
       const numMatch = cleaned.match(/(\d+)/);
       if (!numMatch) return { seqKey: "S1", order: SEQUENCES.S1 };
 
-      const num = parseInt(numMatch[1], 10);
-      if (num >= 1 && num <= 4) return { seqKey: "S1", order: SEQUENCES.S1 };
-      if (num >= 5 && num <= 8) return { seqKey: "S2", order: SEQUENCES.S2 };
-      if (num >= 9 && num <= 12) return { seqKey: "S3", order: SEQUENCES.S3 };
-      if (num >= 13 && num <= 16) return { seqKey: "S4", order: SEQUENCES.S4 };
-      if (num >= 17 && num <= 20) return { seqKey: "S5", order: SEQUENCES.S5 };
-      if (num >= 21 && num <= 24) return { seqKey: "S6", order: SEQUENCES.S6 };
+      let num = parseInt(numMatch[1], 10);
+      if (num < 1) num = 1;
+      if (num > 18) num = ((num - 1) % 18) + 1;
 
-      const seqKeys = ["S1", "S2", "S3", "S4", "S5", "S6"];
-      const key = seqKeys[(num - 1) % 6];
-      return { seqKey: key, order: SEQUENCES[key] };
+      const key = `S${num}`;
+      return { seqKey: key, order: SEQUENCES[key] || SEQUENCES.S1 };
     }
+
+    // Questionnaire URL (opened in new tab)
+    const QUESTIONNAIRE_URL = "https://forms.google.com";
 
     const LIKERT_QUESTIONS = [
       "This interaction required a lot of effort.",
@@ -1921,10 +1931,10 @@ You would need to save approximately £667 per month.`;
                     <div class="task-complete-box">
                       <div class="complete-header">
                         <span>✓</span>
-                        <span>Task complete. Please continue to the questionnaire.</span>
+                        <span>Task finished. Please proceed to the post-task questionnaire.</span>
                       </div>
-                      <button class="btn-primary" style="width: fit-content;" onclick="app.showQuestionnaireModal()">
-                        Complete Post-Task Questionnaire →
+                      <button class="btn-primary" style="width: fit-content;" onclick="app.proceedToQuestionnaire()">
+                        Proceed to Questionnaire →
                       </button>
                     </div>
                   ` : ''}
@@ -2132,94 +2142,139 @@ You would need to save approximately £667 per month.`;
         }
       }
 
-      // Step 4: Questionnaire Modal (Glitch-free, no shaking)
-      showQuestionnaireModal() {
-        this.setProcessStep(4); // Step 4: Post-task questionnaire
-        const spec = this.currentTaskSpec();
-
-        const questionsHtml = LIKERT_QUESTIONS.map((q, qIdx) => {
-          const optionsHtml = [1, 2, 3, 4, 5, 6, 7].map(num => `
-            <div class="likert-cell ${this.ratings[qIdx] === num ? 'selected' : ''}" 
-                 onclick="app.selectLikert(${qIdx}, ${num})">
-              <span class="likert-cell-num">${num}</span>
-              <span class="likert-cell-label">${num === 1 ? 'Strongly<br>disagree' : num === 7 ? 'Strongly<br>agree' : num === 4 ? 'Neutral' : ''}</span>
-            </div>
-          `).join("");
-
-          return `
-            <div class="likert-block">
-              <div class="likert-question-text">${qIdx + 1}. “${q}”</div>
-              <div class="likert-numbers-row" id="likert-row-${qIdx}">
-                ${optionsHtml}
-              </div>
-            </div>
-          `;
-        }).join("");
-
-        this.modalLayer.innerHTML = `
-          <div class="modal-backdrop">
-            <div class="modal-card">
-              <div class="modal-title">Task ${this.currentTaskIdx + 1} Feedback</div>
-              <div class="modal-sub">
-                Please rate your experience with TaskGPT for <strong>Task ${this.currentTaskIdx + 1}: ${spec.title}</strong> (1 = Strongly Disagree, 7 = Strongly Agree):
-              </div>
-
-              <div style="max-height: 52vh; overflow-y: auto; padding-right: 6px;">
-                ${questionsHtml}
-              </div>
-
-              <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
-                <button class="btn-primary" onclick="app.submitQuestionnaire()">
-                  Submit Feedback & Continue →
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
-      }
-
-      // Direct DOM update: ZERO modal re-renders, ZERO animation re-triggers, ZERO shake!
-      selectLikert(qIdx, val) {
-        this.ratings[qIdx] = val;
-        const row = document.getElementById(`likert-row-${qIdx}`);
-        if (row) {
-          const cells = row.querySelectorAll('.likert-cell');
-          cells.forEach((cell, idx) => {
-            if (idx + 1 === val) {
-              cell.classList.add('selected');
-            } else {
-              cell.classList.remove('selected');
-            }
-          });
-        }
-      }
-
-      submitQuestionnaire() {
-        const allAnswered = this.ratings.every(r => r !== null);
-        if (!allAnswered) {
-          alert("Please answer all 4 rating questions before continuing.");
-          return;
-        }
-
+      // Questionnaire Flow: External Link in New Tab + 10s Countdown + Return Confirmation
+      proceedToQuestionnaire() {
         const endTime = new Date();
         const start = this.taskStartTime || new Date(endTime.getTime() - 45000);
         const durationSec = Math.max(1, Math.round((endTime.getTime() - start.getTime()) / 1000));
         const durationFmt = this.formatDuration(durationSec);
 
-        this.recordTaskCompletionData(durationSec, durationFmt, this.ratings);
+        // Record time immediately
+        this.recordTaskCompletionData(durationSec, durationFmt, ["External Questionnaire"]);
 
-        this.completedTasks[this.currentTaskIdx] = true;
-        this.modalLayer.innerHTML = "";
-
-        const allCompleted = this.completedTasks.every(d => d === true);
-
-        if (allCompleted) {
-          this.showStudyCompleteModal();
-        } else {
-          const nextIdx = (this.currentTaskIdx + 1) % 3;
-          this.loadTask(nextIdx);
-          this.showToast(`Task ${this.currentTaskIdx} completed! Ready for Task ${this.currentTaskIdx + 1}.`);
+        // Open questionnaire in new tab
+        try {
+          window.open(QUESTIONNAIRE_URL, "_blank");
+        } catch(e) {
+          console.warn("Could not open new tab", e);
         }
+
+        // Show 10-second timer countdown modal
+        this.showQuestionnaireTimerModal();
+      }
+
+      showQuestionnaireTimerModal() {
+        this.setProcessStep(4); // Step 4: Post-task questionnaire
+        let timeLeft = 10;
+
+        if (this.questionnaireTimer) {
+          clearInterval(this.questionnaireTimer);
+          this.questionnaireTimer = null;
+        }
+
+        const renderModal = (sec, isReady) => {
+          return `
+            <div class="modal-backdrop">
+              <div class="modal-card" style="max-width: 480px; text-align: center; padding: 36px 30px;">
+                <div style="font-size: 46px; margin-bottom: 12px;">📋</div>
+                <div class="modal-title" style="font-size: 21px; margin-bottom: 10px;">
+                  Task ${this.currentTaskIdx + 1} Finished
+                </div>
+                <div class="modal-sub" style="font-size: 13.5px; line-height: 1.6; margin-bottom: 22px; color: var(--text-muted);">
+                  The post-task questionnaire has been opened in a new tab.<br>
+                  Please fill out the questionnaire and then return here.
+                </div>
+
+                <div style="background: rgba(124, 58, 237, 0.12); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 12px; padding: 18px 16px; margin-bottom: 24px;">
+                  <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #a78bfa; margin-bottom: 6px;">
+                    Questionnaire Submission Timer
+                  </div>
+                  <div id="q-timer-display" style="font-size: 34px; font-weight: 700; font-family: monospace; color: ${isReady ? '#34d399' : '#fff'};">
+                    ${isReady ? '✓ Ready' : sec + 's'}
+                  </div>
+                  <div style="font-size: 12px; color: #71717a; margin-top: 4px;">
+                    ${isReady ? 'You can now confirm your submission below.' : 'Timer counting down while you complete the questionnaire.'}
+                  </div>
+                </div>
+
+                ${!isReady ? `
+                  <button id="q-submitted-btn" class="btn-primary" style="width: 100%; opacity: 0.55; cursor: not-allowed;" disabled>
+                    ⏳ Please complete questionnaire in new tab (${sec}s)...
+                  </button>
+                ` : `
+                  <button id="q-submitted-btn" class="btn-primary" style="width: 100%;" onclick="app.confirmQuestionnaireSubmitted()">
+                    ✓ I have submitted the questionnaire
+                  </button>
+                `}
+
+                <div style="margin-top: 14px;">
+                  <a href="${QUESTIONNAIRE_URL}" target="_blank" style="color: #a78bfa; font-size: 12px; text-decoration: underline;">
+                    Didn't open? Click here to open questionnaire ↗
+                  </a>
+                </div>
+              </div>
+            </div>
+          `;
+        };
+
+        this.modalLayer.innerHTML = renderModal(timeLeft, false);
+
+        this.questionnaireTimer = setInterval(() => {
+          timeLeft--;
+          if (timeLeft > 0) {
+            const timerEl = document.getElementById("q-timer-display");
+            const btnEl = document.getElementById("q-submitted-btn");
+            if (timerEl) timerEl.textContent = timeLeft + "s";
+            if (btnEl) btnEl.textContent = `⏳ Please complete questionnaire in new tab (${timeLeft}s)...`;
+          } else {
+            clearInterval(this.questionnaireTimer);
+            this.questionnaireTimer = null;
+            this.modalLayer.innerHTML = renderModal(0, true);
+          }
+        }, 1000);
+      }
+
+      confirmQuestionnaireSubmitted() {
+        if (this.questionnaireTimer) {
+          clearInterval(this.questionnaireTimer);
+          this.questionnaireTimer = null;
+        }
+
+        // Mark current task completed
+        this.completedTasks[this.currentTaskIdx] = true;
+        this.updateSidebarUI();
+
+        if (this.currentTaskIdx < 2) {
+          const nextIdx = this.currentTaskIdx + 1;
+          const nextTNum = parseInt(this.seqInfo.order[nextIdx].charAt(1), 10);
+          const nextSpec = TASK_SPECS[nextTNum];
+
+          this.modalLayer.innerHTML = `
+            <div class="modal-backdrop">
+              <div class="modal-card" style="max-width: 480px; text-align: center; padding: 36px 30px;">
+                <div style="font-size: 50px; margin-bottom: 12px;">✅</div>
+                <div class="modal-title" style="font-size: 21px; margin-bottom: 10px;">
+                  Task ${this.currentTaskIdx + 1} Completed!
+                </div>
+                <div class="modal-sub" style="font-size: 14px; line-height: 1.6; margin-bottom: 24px; color: var(--text-muted);">
+                  Your questionnaire submission has been confirmed.<br>
+                  Next up is <strong>Task ${nextIdx + 1}: ${nextSpec.title}</strong>.
+                </div>
+                <button class="btn-primary" style="width: 100%;" onclick="app.proceedToNextTask(${nextIdx})">
+                  Continue to Task ${nextIdx + 1} →
+                </button>
+              </div>
+            </div>
+          `;
+        } else {
+          this.showStudyCompleteModal();
+        }
+      }
+
+      proceedToNextTask(nextIdx) {
+        this.modalLayer.innerHTML = "";
+        this.loadTask(nextIdx);
+        this.showBriefingModal();
       }
 
       formatDuration(sec) {
@@ -2325,13 +2380,14 @@ You would need to save approximately £667 per month.`;
             <div class="modal-card" style="text-align: center; max-width: 480px; padding: 36px 28px;">
               <div style="font-size: 54px; margin-bottom: 16px;">🎉</div>
               <div class="modal-title" style="font-size: 22px; margin-bottom: 12px;">
-                Thank you for participating in this task.
+                Congratulations, you have finished your tasks!
               </div>
-              <div class="modal-sub" style="margin-bottom: 24px; font-size: 14px;">
-                All three tasks have been successfully completed and recorded.
+              <div class="modal-sub" style="margin-bottom: 24px; font-size: 14px; line-height: 1.6; color: var(--text-muted);">
+                Thank you for participating in this research study.<br>
+                All three tasks and questionnaires have been successfully recorded.
               </div>
               <button class="btn-primary" onclick="app.closeAndResetStudySession()">
-                Close
+                Done / Finish Study
               </button>
             </div>
           </div>
@@ -2351,7 +2407,7 @@ You would need to save approximately £667 per month.`;
             <div class="modal-card" style="max-width: 440px; text-align: center;">
               <div class="modal-title">Welcome to TaskGPT</div>
               <div class="modal-sub">
-                Please enter your assigned Participant Code (e.g., <strong>P01</strong> to <strong>P24</strong>) to begin:
+                Please enter your assigned Participant Code (e.g., <strong>P01</strong> to <strong>P18</strong>) to begin:
               </div>
               <form onsubmit="event.preventDefault(); app.submitCodeEntry();">
                 <input type="text" id="participant-code-input" class="code-input-field" 

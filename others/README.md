@@ -9,8 +9,8 @@ A desktop web application designed for a controlled university UX research study
 Both the **Participant Web App** and the **Researcher Admin Dashboard** live in this single project and share the same domain and backend:
 
 1. **Participant Chat Web App**: `https://<your-project>.vercel.app/`
-   - Participants enter their assigned code (`P01` to `P24`).
-   - Automatically assigns the Latin-square condition sequence (S1 to S6).
+   - Participants enter their assigned code (`P01` to `P18`).
+   - Automatically assigns the Latin-square condition sequence (S1 to S18).
    - Strict gating: Task 1 must be completed before Task 2, and Task 2 before Task 3.
    - Accurately tracks exact seconds and minutes spent on each task.
 
