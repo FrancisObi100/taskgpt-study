@@ -131,11 +131,11 @@ async function writeToStorage(data) {
     clearTimeout(timer);
     if (!res.ok) {
       const errText = await res.text();
-      console.warn("Cloud storage write failed with status", res.status, errText);
+      return { ok: false, status: res.status, statusText: res.statusText, errText };
     }
-    return res.ok;
+    return { ok: true, status: res.status };
   } catch (err) {
-    console.warn("Cloud storage write error:", err.message);
+    return { ok: false, error: err.message };
   }
 
   return true;
