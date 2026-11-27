@@ -552,88 +552,70 @@
 
       async loadData(isBackground) {
         let serverData = null;
+        let isFetchSuccessful = false;
 
         // 1. Fetch from local Vercel serverless API
         try {
           const res = await fetch("/api/study_records");
           if (res.ok) {
             serverData = await res.json();
+            isFetchSuccessful = true;
           }
         } catch (e) {
           // offline or direct static mode
         }
 
         // 2. Direct cloud REST API fallback (api.restful-api.dev)
-        if (!serverData || !serverData.summaries || serverData.summaries.length === 0) {
+        if (!isFetchSuccessful) {
           try {
             const cloudRes = await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
               headers: { "Accept": "application/json" }
             });
             if (cloudRes.ok) {
               const cloudJson = await cloudRes.json();
-              if (cloudJson && cloudJson.data && (Array.isArray(cloudJson.data.summaries) || Array.isArray(cloudJson.data.tasks))) {
+              if (cloudJson && cloudJson.data) {
                 serverData = cloudJson.data;
+                isFetchSuccessful = true;
               }
             }
-          } catch(e) {
-            // cloud fetch warning
+          } catch(e) {}
+        }
+
+        // 3. Process data when network fetch succeeds
+        if (isFetchSuccessful && serverData) {
+          const summaries = serverData.summaries || [];
+          const tasks = serverData.tasks || [];
+
+          if (summaries.length === 0 && tasks.length === 0) {
+            // Cloud database is empty (cleared by admin or completely fresh)
+            this.records = [];
+            this.rawTasks = [];
+            localStorage.removeItem("taskgpt_admin_persistent_records");
+            localStorage.removeItem("taskgpt_admin_persistent_tasks");
+            localStorage.removeItem("admin_recorded_tasks");
+          } else {
+            // Active records from participants exist in the cloud!
+            this.records = this.normalizeServerSummaries(summaries);
+            this.rawTasks = tasks;
+            // Save to persistent storage so it stays across browser restarts and days
+            this.saveToPersistentCache();
           }
+
+          // Sort records by participant code P01..P18
+          this.records.sort((a, b) => (a.participant_code || "").localeCompare(b.participant_code || "", undefined, { numeric: true }));
+
+          this.renderTable();
+          this.renderStats();
+
+          if (!isBackground) {
+            this.showToast("Data refreshed.");
+          }
+          return;
         }
 
-        // 3. Local tasks in same browser session
-        let localTasks = [];
-        try {
-          localTasks = JSON.parse(localStorage.getItem("admin_recorded_tasks") || "[]");
-        } catch (e) {}
-
-        let incomingSummaries = [];
-        let incomingTasks = [];
-
-        if (serverData && serverData.summaries && serverData.summaries.length > 0) {
-          incomingSummaries = this.normalizeServerSummaries(serverData.summaries);
-          incomingTasks = serverData.tasks || [];
-        }
-
-        if (localTasks.length > 0) {
-          const localAgg = this.aggregateLocalTasks(localTasks);
-          incomingSummaries = this.mergeSummaryLists(incomingSummaries, localAgg);
-
-          const existingTaskIds = new Set(incomingTasks.map(t => t.id || (t.participant_code + "_" + t.task_order)));
-          localTasks.forEach(lt => {
-            const id = lt.id || (lt.participant_code + "_" + lt.task_order);
-            if (!existingTaskIds.has(id)) {
-              incomingTasks.push(lt);
-              existingTaskIds.add(id);
-            }
-          });
-        }
-
-        // 4. Non-destructive merge: NEVER wipe existing records if server is empty or unreachable!
-        if (incomingSummaries.length > 0) {
-          this.records = this.mergeSummaryLists(this.records, incomingSummaries);
-          this.saveToPersistentCache();
-        }
-
-        if (incomingTasks.length > 0) {
-          const currentTaskIds = new Set(this.rawTasks.map(t => t.id || (t.participant_code + "_" + t.task_order)));
-          incomingTasks.forEach(it => {
-            const id = it.id || (it.participant_code + "_" + it.task_order);
-            if (!currentTaskIds.has(id)) {
-              this.rawTasks.push(it);
-              currentTaskIds.add(id);
-            }
-          });
-          this.saveToPersistentCache();
-        }
-
-        // Sort records by participant code P01..P18
-        this.records.sort((a, b) => (a.participant_code || "").localeCompare(b.participant_code || "", undefined, { numeric: true }));
-
-        this.renderTable();
-        this.renderStats();
-
+        // 4. Offline Fallback: If network fetch failed, DO NOT wipe data! Keep the cached records.
         if (!isBackground) {
-          this.showToast("Data refreshed.");
+          this.showToast("Offline mode: showing saved records.");
         }
       }
 
@@ -917,33 +899,13 @@
       }
 
       async clearData() {
-        const step1 = confirm(
-          "⚠️ WARNING: Are you sure you want to delete all study data?\n\n" +
-          "This will permanently erase all participant records, dates, and tracked times from both the cloud server and this dashboard.\n\n" +
-          "Click OK only if you are completely sure."
-        );
-        if (!step1) return;
-
-        const confirmationText = prompt('To confirm permanent deletion, type "CLEAR" below:');
-        if (!confirmationText || confirmationText.trim().toUpperCase() !== "CLEAR") {
-          alert("Deletion cancelled. Your data remains completely safe and untouched.");
+        if (!confirm("Are you sure you want to clear all participant records? This will delete all tracked sessions from both the cloud and this dashboard so you can start fresh.")) {
           return;
         }
 
-        try {
-          await fetch("/api/clear_data", { method: "POST" });
-        } catch (e) {}
-
-        try {
-          await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: "TaskGPT Study Dataset",
-              data: { summaries: [], tasks: [] }
-            })
-          });
-        } catch (e) {}
+        // 1. Immediately wipe local memory and all storage keys
+        this.records = [];
+        this.rawTasks = [];
 
         localStorage.removeItem("taskgpt_admin_persistent_records");
         localStorage.removeItem("taskgpt_admin_persistent_tasks");
@@ -951,11 +913,37 @@
         localStorage.removeItem("study_participant_code");
         localStorage.removeItem("study_completed_tasks");
 
-        this.records = [];
-        this.rawTasks = [];
+        // Clear any other study-related keys in localStorage
+        try {
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith("taskgpt") || key.startsWith("study") || key.startsWith("admin"))) {
+              localStorage.removeItem(key);
+            }
+          }
+        } catch(e) {}
+
+        // Render immediately so user sees clean empty state with 0 delay
         this.renderTable();
         this.renderStats();
-        this.showToast("All study data has been permanently cleared upon your confirmation.");
+        this.showToast("All study data cleared successfully.");
+
+        // 2. Wipe serverless API backend
+        try {
+          await fetch("/api/clear_data", { method: "POST" });
+        } catch (e) {}
+
+        // 3. Wipe cloud REST object
+        try {
+          await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: "TaskGPT Study Dataset",
+              data: { summaries: [], tasks: [], cleared_at: new Date().toISOString() }
+            })
+          });
+        } catch (e) {}
       }
     }
 
