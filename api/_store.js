@@ -118,8 +118,8 @@ async function writeToStorage(data) {
   // Option 2: Cloud REST API Endpoint
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
-    await fetch(CLOUD_DATA_URL, {
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(CLOUD_DATA_URL, {
       method: "PUT",
       signal: controller.signal,
       headers: { "Content-Type": "application/json" },
@@ -129,7 +129,11 @@ async function writeToStorage(data) {
       })
     });
     clearTimeout(timer);
-    return true;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn("Cloud storage write failed with status", res.status, errText);
+    }
+    return res.ok;
   } catch (err) {
     console.warn("Cloud storage write error:", err.message);
   }
@@ -180,8 +184,8 @@ async function registerParticipantSession(payload) {
   }
 
   summaries.sort((a, b) => a.participant_code.localeCompare(b.participant_code, undefined, { numeric: true }));
-  await writeToStorage({ summaries, tasks });
-  return { status: "ok", message: "Participant session registered", summary };
+  const writeSuccess = await writeToStorage({ summaries, tasks });
+  return { status: "ok", message: "Participant session registered", writeSuccess, summary };
 }
 
 async function recordTaskTime(payload) {
