@@ -71,25 +71,29 @@ async function readFromStorage() {
     }
   }
 
-  // Option 2: Cloud REST API Endpoint (Works across all devices & deployments without cold-start loss)
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(CLOUD_DATA_URL, {
-      signal: controller.signal,
-      headers: { "Accept": "application/json" }
-    });
-    clearTimeout(timer);
+  // Option 2: Cloud REST API Endpoint with retry
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(CLOUD_DATA_URL, {
+        signal: controller.signal,
+        headers: { "Accept": "application/json" }
+      });
+      clearTimeout(timer);
 
-    if (res.ok) {
-      const json = await res.json();
-      if (json && json.data && Array.isArray(json.data.summaries)) {
-        memoryData = json.data;
-        return json.data;
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.data && Array.isArray(json.data.summaries)) {
+          memoryData = json.data;
+          return json.data;
+        }
       }
+      if (attempt < 2) await new Promise(r => setTimeout(r, 800));
+    } catch (err) {
+      console.warn("Cloud storage read error:", err.message);
+      if (attempt < 2) await new Promise(r => setTimeout(r, 800));
     }
-  } catch (err) {
-    console.warn("Cloud storage read error:", err.message);
   }
 
   return memoryData;
@@ -115,27 +119,42 @@ async function writeToStorage(data) {
     }
   }
 
-  // Option 2: Cloud REST API Endpoint
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(CLOUD_DATA_URL, {
-      method: "PUT",
-      signal: controller.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: "TaskGPT Study Dataset 2026",
-        data: data
-      })
-    });
-    clearTimeout(timer);
-    return res.ok;
-  } catch (err) {
-    console.warn("Cloud storage write error:", err.message);
-    return false;
+  // Option 2: Cloud REST API Endpoint with retry
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(CLOUD_DATA_URL, {
+        method: "PUT",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          name: "TaskGPT Study Dataset 2026",
+          data: data
+        })
+      });
+      clearTimeout(timer);
+
+      if (res.ok) {
+        return true;
+      }
+
+      console.warn(`Cloud storage write attempt ${attempt} failed with status:`, res.status);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
+    } catch (err) {
+      console.warn(`Cloud storage write attempt ${attempt} error:`, err.message);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
+    }
   }
 
-  return true;
+  return false;
 }
 
 async function getStudyData() {
@@ -261,7 +280,12 @@ async function recordTaskTime(payload) {
   const t3 = parseFloat(summary.task3_duration || 0);
   summary.total_duration_seconds = t1 + t2 + t3;
   summary.total_duration_formatted = formatDuration(summary.total_duration_seconds);
-  summary.is_completed = (t1 > 0 && t2 > 0 && t3 > 0) ? 1 : 0;
+  let compCount = 0;
+  if (t1 > 0) compCount++;
+  if (t2 > 0) compCount++;
+  if (t3 > 0) compCount++;
+  summary.completed_count = compCount;
+  summary.is_completed = compCount === 3 ? 1 : 0;
   summary.last_updated = new Date().toISOString();
 
   // Sort summaries P01..P18
