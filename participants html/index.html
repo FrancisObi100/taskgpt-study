@@ -2440,10 +2440,66 @@ You would need to save approximately £667 per month.`;
         this.seqInfo = resolveSequenceForParticipant(val);
         this.completedTasks = [false, false, false];
 
+        // Register session immediately so admin sees participant active in real time
+        this.registerSessionStart(val, this.seqInfo.seqKey);
+
         this.modalLayer.innerHTML = "";
         this.setProcessStep(1); // Step 1: Task briefing
         this.updateSidebarUI();
         this.showBriefingModal();
+      }
+
+      registerSessionStart(code, seq) {
+        const payload = {
+          participant_code: code,
+          sequence: seq,
+          timestamp: new Date().toISOString()
+        };
+
+        // 1. Send to serverless API
+        fetch("/api/register_participant", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(function() {});
+
+        // 2. Direct cloud REST sync fallback
+        try {
+          fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+            headers: { "Accept": "application/json" }
+          }).then(function(res) { return res.json(); }).then(function(json) {
+            var data = (json && json.data) ? json.data : { summaries: [], tasks: [] };
+            data.summaries = data.summaries || [];
+            data.tasks = data.tasks || [];
+
+            var existing = data.summaries.find(function(s) { return s.participant_code === code; });
+            if (!existing) {
+              var seqTasks = SEQUENCES[seq] || ["A1", "B2", "C3"];
+              data.summaries.push({
+                participant_code: code,
+                sequence: seq,
+                task1_code: seqTasks[0], task1_duration: 0, task1_formatted: "",
+                task2_code: seqTasks[1], task2_duration: 0, task2_formatted: "",
+                task3_code: seqTasks[2], task3_duration: 0, task3_formatted: "",
+                total_duration_seconds: 0, total_duration_formatted: "0s",
+                is_completed: 0, completed_count: 0,
+                last_updated: payload.timestamp
+              });
+              data.summaries.sort(function(a, b) {
+                return (a.participant_code || "").localeCompare(b.participant_code || "", undefined, { numeric: true });
+              });
+
+              fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  name: "TaskGPT Study Dataset",
+                  data: data
+                })
+              }).catch(function() {});
+            }
+          }).catch(function() {});
+        } catch(e) {}
       }
 
       showBriefingModal() {

@@ -145,6 +145,45 @@ async function getStudyData() {
   };
 }
 
+async function registerParticipantSession(payload) {
+  const data = await readFromStorage();
+  const tasks = data.tasks || [];
+  const summaries = data.summaries || [];
+
+  const pCode = (payload.participant_code || "UNKNOWN").toUpperCase().trim();
+  const seq = payload.sequence || getSequenceForCode(pCode);
+  const seqTasks = SEQUENCES[seq] || ["A1", "B2", "C3"];
+
+  let summary = summaries.find(s => s.participant_code === pCode);
+  if (!summary) {
+    summary = {
+      participant_code: pCode,
+      sequence: seq,
+      task1_code: seqTasks[0],
+      task1_duration: 0,
+      task1_formatted: "",
+      task2_code: seqTasks[1],
+      task2_duration: 0,
+      task2_formatted: "",
+      task3_code: seqTasks[2],
+      task3_duration: 0,
+      task3_formatted: "",
+      total_duration_seconds: 0,
+      total_duration_formatted: "0s",
+      is_completed: 0,
+      completed_count: 0,
+      last_updated: payload.timestamp || new Date().toISOString()
+    };
+    summaries.push(summary);
+  } else {
+    summary.last_updated = payload.timestamp || new Date().toISOString();
+  }
+
+  summaries.sort((a, b) => a.participant_code.localeCompare(b.participant_code, undefined, { numeric: true }));
+  await writeToStorage({ summaries, tasks });
+  return { status: "ok", message: "Participant session registered", summary };
+}
+
 async function recordTaskTime(payload) {
   const data = await readFromStorage();
   const tasks = data.tasks || [];
@@ -296,6 +335,7 @@ function generateCSV(summaries) {
 
 module.exports = {
   getStudyData,
+  registerParticipantSession,
   recordTaskTime,
   clearStudyData,
   generateCSV,

@@ -303,6 +303,19 @@
       color: #34d399;
     }
 
+    .time-val-badge.active-time {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      font-weight: 600;
+      animation: pulseActive 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseActive {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+
     .time-val-badge.pending-time {
       color: #71717a;
       font-weight: 500;
@@ -795,22 +808,38 @@
 
         const self = this;
         tbody.innerHTML = this.records.map(function(r) {
-          const isComp = r.is_completed === 1;
+          const compCount = r.completed_count || 0;
+          const isComp = r.is_completed === 1 || compCount === 3;
           const statusBadge = isComp 
             ? '<span class="badge badge-status-completed">✓ Completed (3/3)</span>' 
-            : '<span class="badge badge-status-progress">In Progress (' + (r.completed_count || 0) + '/3)</span>';
+            : '<span class="badge badge-status-progress">In Progress (' + compCount + '/3)</span>';
 
-          const t1Display = r.task1_duration > 0
-            ? '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task1_formatted || self.fmtDuration(r.task1_duration)) + '</span><span class="task-code-meta">' + r.task1_code + '</span></div>'
-            : '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task1_code + '</span></div>';
+          let t1Display;
+          if (r.task1_duration > 0) {
+            t1Display = '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task1_formatted || self.fmtDuration(r.task1_duration)) + '</span><span class="task-code-meta">' + r.task1_code + '</span></div>';
+          } else if (compCount === 0) {
+            t1Display = '<div class="time-cell-wrap"><span class="time-val-badge active-time">⚡ Active</span><span class="task-code-meta">' + r.task1_code + '</span></div>';
+          } else {
+            t1Display = '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task1_code + '</span></div>';
+          }
 
-          const t2Display = r.task2_duration > 0
-            ? '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task2_formatted || self.fmtDuration(r.task2_duration)) + '</span><span class="task-code-meta">' + r.task2_code + '</span></div>'
-            : '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task2_code + '</span></div>';
+          let t2Display;
+          if (r.task2_duration > 0) {
+            t2Display = '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task2_formatted || self.fmtDuration(r.task2_duration)) + '</span><span class="task-code-meta">' + r.task2_code + '</span></div>';
+          } else if (compCount === 1) {
+            t2Display = '<div class="time-cell-wrap"><span class="time-val-badge active-time">⚡ Active</span><span class="task-code-meta">' + r.task2_code + '</span></div>';
+          } else {
+            t2Display = '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task2_code + '</span></div>';
+          }
 
-          const t3Display = r.task3_duration > 0
-            ? '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task3_formatted || self.fmtDuration(r.task3_duration)) + '</span><span class="task-code-meta">' + r.task3_code + '</span></div>'
-            : '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task3_code + '</span></div>';
+          let t3Display;
+          if (r.task3_duration > 0) {
+            t3Display = '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task3_formatted || self.fmtDuration(r.task3_duration)) + '</span><span class="task-code-meta">' + r.task3_code + '</span></div>';
+          } else if (compCount === 2) {
+            t3Display = '<div class="time-cell-wrap"><span class="time-val-badge active-time">⚡ Active</span><span class="task-code-meta">' + r.task3_code + '</span></div>';
+          } else {
+            t3Display = '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task3_code + '</span></div>';
+          }
 
           const dt = self.formatDateTime(r.last_updated);
           const dtDisplay = (dt.date !== "-")
