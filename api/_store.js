@@ -47,7 +47,7 @@ let memoryData = {
   tasks: []
 };
 
-const KV_CLOUD_FALLBACK = "https://kvdb.io/K9mTaskGPTStudy2026/study_dataset_v1";
+const CLOUD_DATA_URL = "https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371";
 
 async function readFromStorage() {
   // Option 1: Vercel KV / Upstash Redis
@@ -71,28 +71,25 @@ async function readFromStorage() {
     }
   }
 
-  // Option 2: Free Public Cloud KV Fallback (Zero Config for Vercel)
+  // Option 2: Cloud REST API Endpoint (Works across all devices & deployments without cold-start loss)
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch(KV_CLOUD_FALLBACK, {
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(CLOUD_DATA_URL, {
       signal: controller.signal,
       headers: { "Accept": "application/json" }
     });
     clearTimeout(timer);
 
     if (res.ok) {
-      const text = await res.text();
-      if (text && text.trim().startsWith("{")) {
-        const parsed = JSON.parse(text);
-        if (parsed && Array.isArray(parsed.summaries)) {
-          memoryData = parsed;
-          return parsed;
-        }
+      const json = await res.json();
+      if (json && json.data && Array.isArray(json.data.summaries)) {
+        memoryData = json.data;
+        return json.data;
       }
     }
   } catch (err) {
-    // Cloud fallback timeout/error - fallback to memory
+    console.warn("Cloud storage read error:", err.message);
   }
 
   return memoryData;
@@ -118,20 +115,23 @@ async function writeToStorage(data) {
     }
   }
 
-  // Option 2: Free Public Cloud KV Fallback
+  // Option 2: Cloud REST API Endpoint
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
-    await fetch(KV_CLOUD_FALLBACK, {
-      method: "POST",
+    const timer = setTimeout(() => controller.abort(), 4000);
+    await fetch(CLOUD_DATA_URL, {
+      method: "PUT",
       signal: controller.signal,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        name: "TaskGPT Study Dataset",
+        data: data
+      })
     });
     clearTimeout(timer);
     return true;
   } catch (err) {
-    console.warn("Cloud fallback write error:", err.message);
+    console.warn("Cloud storage write error:", err.message);
   }
 
   return true;
@@ -253,10 +253,23 @@ function generateCSV(summaries) {
     "Total Study Duration (Seconds)",
     "Total Study Duration (Formatted)",
     "Status",
+    "Date Recorded",
+    "Time Recorded",
     "Last Active Timestamp"
   ];
 
   const rows = (summaries || []).map(r => {
+    let dateStr = "-";
+    let timeStr = "-";
+    if (r.last_updated && r.last_updated !== "-") {
+      try {
+        const d = new Date(r.last_updated);
+        if (!isNaN(d.getTime())) {
+          dateStr = d.toISOString().slice(0, 10);
+          timeStr = d.toTimeString().slice(0, 8);
+        }
+      } catch(e) {}
+    }
     return [
       r.participant_code,
       r.sequence,
@@ -272,6 +285,8 @@ function generateCSV(summaries) {
       r.total_duration_seconds || 0,
       `"${r.total_duration_formatted || formatDuration(r.total_duration_seconds) || '0s'}"`,
       `"${r.is_completed === 1 ? 'Completed (3/3)' : 'In Progress'}"`,
+      `"${dateStr}"`,
+      `"${timeStr}"`,
       `"${r.last_updated || '-'}"`
     ].join(",");
   });

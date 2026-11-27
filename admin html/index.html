@@ -441,7 +441,7 @@
               <th>Task 3 Time</th>
               <th>Total Duration</th>
               <th>Status</th>
-              <th>Last Active</th>
+              <th>Date & Time Recorded</th>
             </tr>
           </thead>
           <tbody id="table-body">
@@ -459,9 +459,47 @@
       constructor() {
         this.records = [];
         this.rawTasks = [];
-        this.loadData();
-        // Auto refresh every 3 seconds
+
+        // 1. Instantly load from permanent browser storage so yesterday's records are displayed immediately
+        this.loadFromPersistentCache();
+        this.renderTable();
+        this.renderStats();
+
+        // 2. Query server & cloud for updates
+        this.loadData(false);
+
+        // 3. Auto background refresh every 3 seconds (strictly non-destructive)
         setInterval(() => this.loadData(true), 3000);
+      }
+
+      loadFromPersistentCache() {
+        try {
+          const savedRecs = localStorage.getItem("taskgpt_admin_persistent_records");
+          if (savedRecs) {
+            const parsed = JSON.parse(savedRecs);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              this.records = parsed;
+            }
+          }
+          const savedTasks = localStorage.getItem("taskgpt_admin_persistent_tasks");
+          if (savedTasks) {
+            const parsed = JSON.parse(savedTasks);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              this.rawTasks = parsed;
+            }
+          }
+        } catch (e) {
+          console.warn("Persistent cache read error:", e);
+        }
+      }
+
+      saveToPersistentCache() {
+        try {
+          localStorage.setItem("taskgpt_admin_persistent_records", JSON.stringify(this.records));
+          localStorage.setItem("taskgpt_admin_persistent_tasks", JSON.stringify(this.rawTasks));
+        } catch (e) {
+          console.warn("Persistent cache write error:", e);
+        }
       }
 
       showToast(msg) {
@@ -486,47 +524,110 @@
         return s + "s";
       }
 
+      formatDateTime(isoStr) {
+        if (!isoStr || isoStr === "-" || typeof isoStr !== "string") {
+          return { date: "-", time: "-" };
+        }
+        try {
+          const d = new Date(isoStr);
+          if (isNaN(d.getTime())) {
+            return { date: isoStr, time: "-" };
+          }
+          const datePart = d.toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric"
+          });
+          const timePart = d.toLocaleTimeString(undefined, {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+          });
+          return { date: datePart, time: timePart };
+        } catch(e) {
+          return { date: isoStr, time: "-" };
+        }
+      }
+
       async loadData(isBackground) {
         let serverData = null;
+
+        // 1. Fetch from local Vercel serverless API
         try {
           const res = await fetch("/api/study_records");
           if (res.ok) {
             serverData = await res.json();
           }
         } catch (e) {
-          // Fallback to cloud direct or localStorage
+          // offline or direct static mode
         }
 
-        // If server API wasn't reachable or returned empty summaries, check cloud KV sync
+        // 2. Direct cloud REST API fallback (api.restful-api.dev)
         if (!serverData || !serverData.summaries || serverData.summaries.length === 0) {
           try {
-            const cloudRes = await fetch("https://kvdb.io/K9mTaskGPTStudy2026/study_dataset_v1", {
+            const cloudRes = await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
               headers: { "Accept": "application/json" }
             });
             if (cloudRes.ok) {
-              const text = await cloudRes.text();
-              if (text && text.trim().startsWith("{")) {
-                const cloudJson = JSON.parse(text);
-                if (cloudJson && Array.isArray(cloudJson.summaries) && cloudJson.summaries.length > 0) {
-                  serverData = cloudJson;
-                }
+              const cloudJson = await cloudRes.json();
+              if (cloudJson && cloudJson.data && (Array.isArray(cloudJson.data.summaries) || Array.isArray(cloudJson.data.tasks))) {
+                serverData = cloudJson.data;
               }
             }
-          } catch(e) {}
+          } catch(e) {
+            // cloud fetch warning
+          }
         }
 
-        const localTasks = JSON.parse(localStorage.getItem("admin_recorded_tasks") || "[]");
+        // 3. Local tasks in same browser session
+        let localTasks = [];
+        try {
+          localTasks = JSON.parse(localStorage.getItem("admin_recorded_tasks") || "[]");
+        } catch (e) {}
+
+        let incomingSummaries = [];
+        let incomingTasks = [];
 
         if (serverData && serverData.summaries && serverData.summaries.length > 0) {
-          this.records = this.normalizeServerSummaries(serverData.summaries);
-          this.rawTasks = serverData.tasks || [];
-        } else if (localTasks.length > 0) {
-          this.rawTasks = localTasks;
-          this.records = this.aggregateLocalTasks(localTasks);
-        } else {
-          this.records = [];
-          this.rawTasks = [];
+          incomingSummaries = this.normalizeServerSummaries(serverData.summaries);
+          incomingTasks = serverData.tasks || [];
         }
+
+        if (localTasks.length > 0) {
+          const localAgg = this.aggregateLocalTasks(localTasks);
+          incomingSummaries = this.mergeSummaryLists(incomingSummaries, localAgg);
+
+          const existingTaskIds = new Set(incomingTasks.map(t => t.id || (t.participant_code + "_" + t.task_order)));
+          localTasks.forEach(lt => {
+            const id = lt.id || (lt.participant_code + "_" + lt.task_order);
+            if (!existingTaskIds.has(id)) {
+              incomingTasks.push(lt);
+              existingTaskIds.add(id);
+            }
+          });
+        }
+
+        // 4. Non-destructive merge: NEVER wipe existing records if server is empty or unreachable!
+        if (incomingSummaries.length > 0) {
+          this.records = this.mergeSummaryLists(this.records, incomingSummaries);
+          this.saveToPersistentCache();
+        }
+
+        if (incomingTasks.length > 0) {
+          const currentTaskIds = new Set(this.rawTasks.map(t => t.id || (t.participant_code + "_" + t.task_order)));
+          incomingTasks.forEach(it => {
+            const id = it.id || (it.participant_code + "_" + it.task_order);
+            if (!currentTaskIds.has(id)) {
+              this.rawTasks.push(it);
+              currentTaskIds.add(id);
+            }
+          });
+          this.saveToPersistentCache();
+        }
+
+        // Sort records by participant code P01..P18
+        this.records.sort((a, b) => (a.participant_code || "").localeCompare(b.participant_code || "", undefined, { numeric: true }));
 
         this.renderTable();
         this.renderStats();
@@ -534,6 +635,61 @@
         if (!isBackground) {
           this.showToast("Data refreshed.");
         }
+      }
+
+      mergeSummaryLists(baseList, incomingList) {
+        const map = {};
+        (baseList || []).forEach(r => {
+          if (r && r.participant_code) {
+            map[r.participant_code.toUpperCase().trim()] = { ...r };
+          }
+        });
+
+        const self = this;
+        (incomingList || []).forEach(inc => {
+          if (!inc || !inc.participant_code) return;
+          const p = inc.participant_code.toUpperCase().trim();
+          if (!map[p]) {
+            map[p] = { ...inc };
+          } else {
+            const curr = map[p];
+            if (inc.task1_duration > 0 || !curr.task1_duration) {
+              curr.task1_code = inc.task1_code || curr.task1_code;
+              curr.task1_duration = inc.task1_duration || curr.task1_duration;
+              curr.task1_formatted = inc.task1_formatted || curr.task1_formatted;
+            }
+            if (inc.task2_duration > 0 || !curr.task2_duration) {
+              curr.task2_code = inc.task2_code || curr.task2_code;
+              curr.task2_duration = inc.task2_duration || curr.task2_duration;
+              curr.task2_formatted = inc.task2_formatted || curr.task2_formatted;
+            }
+            if (inc.task3_duration > 0 || !curr.task3_duration) {
+              curr.task3_code = inc.task3_code || curr.task3_code;
+              curr.task3_duration = inc.task3_duration || curr.task3_duration;
+              curr.task3_formatted = inc.task3_formatted || curr.task3_formatted;
+            }
+
+            let compCount = 0;
+            if (curr.task1_duration > 0) compCount++;
+            if (curr.task2_duration > 0) compCount++;
+            if (curr.task3_duration > 0) compCount++;
+            curr.completed_count = compCount;
+            curr.is_completed = compCount === 3 ? 1 : 0;
+
+            const tot = (curr.task1_duration || 0) + (curr.task2_duration || 0) + (curr.task3_duration || 0);
+            curr.total_duration_seconds = tot;
+            curr.total_duration_formatted = self.fmtDuration(tot) || "0s";
+            curr.sequence = inc.sequence || curr.sequence || "S1";
+
+            if (inc.last_updated && inc.last_updated !== "-") {
+              if (!curr.last_updated || curr.last_updated === "-" || new Date(inc.last_updated) > new Date(curr.last_updated)) {
+                curr.last_updated = inc.last_updated;
+              }
+            }
+          }
+        });
+
+        return Object.values(map);
       }
 
       normalizeServerSummaries(summaries) {
@@ -651,7 +807,7 @@
         if (!tbody) return;
 
         if (this.records.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="empty-row">No participant sessions recorded yet.<br><span style="font-size: 12px; color: #71717a;">Participants will appear here automatically when they enter their code and complete tasks.</span></td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" class="empty-row">No participant sessions recorded yet.<br><span style="font-size: 12px; color: #71717a;">Participants will appear here automatically when they enter their code and complete tasks. Data remains permanently saved across days until you choose to clear it.</span></td></tr>';
           return;
         }
 
@@ -674,9 +830,10 @@
             ? '<div class="time-cell-wrap"><span class="time-val-badge completed-time">⏱️ ' + (r.task3_formatted || self.fmtDuration(r.task3_duration)) + '</span><span class="task-code-meta">' + r.task3_code + '</span></div>'
             : '<div class="time-cell-wrap"><span class="time-val-badge pending-time">— Pending —</span><span class="task-code-meta">' + r.task3_code + '</span></div>';
 
-          const updatedStr = r.last_updated && r.last_updated !== "-"
-            ? r.last_updated.replace("T", " ").substring(0, 19)
-            : "-";
+          const dt = self.formatDateTime(r.last_updated);
+          const dtDisplay = (dt.date !== "-")
+            ? '<div style="font-weight: 600; color: #f4f4f5; font-size: 13px;">📅 ' + dt.date + '</div><div style="font-size: 11.5px; color: #a1a1aa; font-family: monospace; margin-top: 2px;">⏰ ' + dt.time + '</div>'
+            : '<span style="color: #71717a; font-size: 12px;">—</span>';
 
           return '<tr>' +
             '<td><span class="badge badge-code">' + r.participant_code + '</span></td>' +
@@ -686,7 +843,7 @@
             '<td>' + t3Display + '</td>' +
             '<td><span class="total-time-badge">' + (r.total_duration_formatted || self.fmtDuration(r.total_duration_seconds) || '0s') + '</span></td>' +
             '<td>' + statusBadge + '</td>' +
-            '<td style="color: #71717a; font-size: 12px; font-family: monospace;">' + updatedStr + '</td>' +
+            '<td>' + dtDisplay + '</td>' +
             '</tr>';
         }).join("");
       }
@@ -713,10 +870,13 @@
           "Total Study Duration (Seconds)",
           "Total Study Duration (Formatted)",
           "Status",
-          "Last Active Timestamp"
+          "Date Recorded",
+          "Time Recorded",
+          "Full Timestamp (ISO)"
         ];
 
         const rows = this.records.map(function(r) {
+          const dt = self.formatDateTime(r.last_updated);
           return [
             r.participant_code,
             r.sequence,
@@ -732,6 +892,8 @@
             r.total_duration_seconds || 0,
             '"' + (r.total_duration_formatted || self.fmtDuration(r.total_duration_seconds) || '0s') + '"',
             '"' + (r.is_completed === 1 ? 'Completed (3/3)' : 'In Progress') + '"',
+            '"' + dt.date + '"',
+            '"' + dt.time + '"',
             '"' + (r.last_updated || '-') + '"'
           ];
         });
@@ -755,26 +917,36 @@
       }
 
       async clearData() {
-        if (!confirm("Are you sure you want to clear all participant records? This will delete all tracked times so you can run fresh study sessions.")) {
+        const step1 = confirm(
+          "⚠️ WARNING: Are you sure you want to delete all study data?\n\n" +
+          "This will permanently erase all participant records, dates, and tracked times from both the cloud server and this dashboard.\n\n" +
+          "Click OK only if you are completely sure."
+        );
+        if (!step1) return;
+
+        const confirmationText = prompt('To confirm permanent deletion, type "CLEAR" below:');
+        if (!confirmationText || confirmationText.trim().toUpperCase() !== "CLEAR") {
+          alert("Deletion cancelled. Your data remains completely safe and untouched.");
           return;
         }
 
         try {
           await fetch("/api/clear_data", { method: "POST" });
-        } catch (e) {
-          // ignore
-        }
+        } catch (e) {}
 
         try {
-          await fetch("https://kvdb.io/K9mTaskGPTStudy2026/study_dataset_v1", {
-            method: "POST",
+          await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+            method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ summaries: [], tasks: [] })
+            body: JSON.stringify({
+              name: "TaskGPT Study Dataset",
+              data: { summaries: [], tasks: [] }
+            })
           });
-        } catch (e) {
-          // ignore
-        }
+        } catch (e) {}
 
+        localStorage.removeItem("taskgpt_admin_persistent_records");
+        localStorage.removeItem("taskgpt_admin_persistent_tasks");
         localStorage.removeItem("admin_recorded_tasks");
         localStorage.removeItem("study_participant_code");
         localStorage.removeItem("study_completed_tasks");
@@ -783,7 +955,7 @@
         this.rawTasks = [];
         this.renderTable();
         this.renderStats();
-        this.showToast("All study data cleared successfully.");
+        this.showToast("All study data has been permanently cleared upon your confirmation.");
       }
     }
 
@@ -791,7 +963,6 @@
     window.addEventListener("DOMContentLoaded", function() {
       adminApp = new AdminApp();
     });
-    // In case DOM is already loaded
     if (document.readyState === "complete" || document.readyState === "interactive") {
       if (!adminApp) adminApp = new AdminApp();
     }
