@@ -2310,65 +2310,6 @@ You would need to save approximately £667 per month.`;
           body: JSON.stringify(payload)
         }).catch(err => console.warn("API save warning", err));
 
-        // Direct cloud sync fallback (ensures cross-device linking across Vercel lambdas)
-        try {
-          fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
-            headers: { "Accept": "application/json" }
-          }).then(function(res) { return res.json(); }).then(function(json) {
-            var data = (json && json.data) ? json.data : { summaries: [], tasks: [] };
-            data.tasks = data.tasks || [];
-            data.summaries = data.summaries || [];
-            data.tasks.push(payload);
-
-            var summary = data.summaries.find(function(s) { return s.participant_code === payload.participant_code; });
-            if (!summary) {
-              summary = {
-                participant_code: payload.participant_code,
-                sequence: payload.sequence,
-                task1_code: "T1", task1_duration: 0, task1_formatted: "",
-                task2_code: "T2", task2_duration: 0, task2_formatted: "",
-                task3_code: "T3", task3_duration: 0, task3_formatted: "",
-                total_duration_seconds: 0, total_duration_formatted: "0s",
-                is_completed: 0, last_updated: new Date().toISOString()
-              };
-              data.summaries.push(summary);
-            }
-
-            if (payload.task_order === 1) {
-              summary.task1_code = payload.task_code;
-              summary.task1_duration = payload.duration_seconds;
-              summary.task1_formatted = payload.duration_formatted;
-            } else if (payload.task_order === 2) {
-              summary.task2_code = payload.task_code;
-              summary.task2_duration = payload.duration_seconds;
-              summary.task2_formatted = payload.duration_formatted;
-            } else if (payload.task_order === 3) {
-              summary.task3_code = payload.task_code;
-              summary.task3_duration = payload.duration_seconds;
-              summary.task3_formatted = payload.duration_formatted;
-            }
-
-            var t1 = summary.task1_duration || 0;
-            var t2 = summary.task2_duration || 0;
-            var t3 = summary.task3_duration || 0;
-            summary.total_duration_seconds = t1 + t2 + t3;
-            var m = Math.floor(summary.total_duration_seconds / 60);
-            var s = Math.round(summary.total_duration_seconds % 60);
-            summary.total_duration_formatted = m > 0 ? (m + "m " + (s < 10 ? "0" : "") + s + "s") : (s + "s");
-            summary.is_completed = (t1 > 0 && t2 > 0 && t3 > 0) ? 1 : 0;
-            summary.last_updated = new Date().toISOString();
-
-            fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                name: "TaskGPT Study Dataset",
-                data: data
-              })
-            }).catch(function() {});
-          }).catch(function() {});
-        } catch (e) {}
-
         try {
           const recs = JSON.parse(localStorage.getItem("admin_recorded_tasks") || "[]");
           recs.push(payload);
@@ -2456,50 +2397,11 @@ You would need to save approximately £667 per month.`;
           timestamp: new Date().toISOString()
         };
 
-        // 1. Send to serverless API
         fetch("/api/register_participant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         }).catch(function() {});
-
-        // 2. Direct cloud REST sync fallback
-        try {
-          fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
-            headers: { "Accept": "application/json" }
-          }).then(function(res) { return res.json(); }).then(function(json) {
-            var data = (json && json.data) ? json.data : { summaries: [], tasks: [] };
-            data.summaries = data.summaries || [];
-            data.tasks = data.tasks || [];
-
-            var existing = data.summaries.find(function(s) { return s.participant_code === code; });
-            if (!existing) {
-              var seqTasks = SEQUENCES[seq] || ["A1", "B2", "C3"];
-              data.summaries.push({
-                participant_code: code,
-                sequence: seq,
-                task1_code: seqTasks[0], task1_duration: 0, task1_formatted: "",
-                task2_code: seqTasks[1], task2_duration: 0, task2_formatted: "",
-                task3_code: seqTasks[2], task3_duration: 0, task3_formatted: "",
-                total_duration_seconds: 0, total_duration_formatted: "0s",
-                is_completed: 0, completed_count: 0,
-                last_updated: payload.timestamp
-              });
-              data.summaries.sort(function(a, b) {
-                return (a.participant_code || "").localeCompare(b.participant_code || "", undefined, { numeric: true });
-              });
-
-              fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  name: "TaskGPT Study Dataset",
-                  data: data
-                })
-              }).catch(function() {});
-            }
-          }).catch(function() {});
-        } catch(e) {}
       }
 
       showBriefingModal() {

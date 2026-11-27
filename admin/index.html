@@ -440,7 +440,7 @@
         <div class="table-title">Participant Time Tracking Log</div>
         <div class="live-dot">
           <div class="pulsing-circle"></div>
-          <span>Live Auto-Sync (Every 3s)</span>
+          <span>Live Auto-Sync (Every 5s)</span>
         </div>
       </div>
       <div class="table-responsive">
@@ -481,8 +481,8 @@
         // 2. Query server & cloud for updates
         this.loadData(false);
 
-        // 3. Auto background refresh every 3 seconds (strictly non-destructive)
-        setInterval(() => this.loadData(true), 3000);
+        // 3. Auto background refresh every 5 seconds (strictly non-destructive)
+        setInterval(() => this.loadData(true), 5000);
       }
 
       loadFromPersistentCache() {
@@ -567,7 +567,7 @@
         let serverData = null;
         let isFetchSuccessful = false;
 
-        // 1. Fetch from local Vercel serverless API
+        // 1. Fetch from serverless API (which queries persistent cloud store)
         try {
           const res = await fetch("/api/study_records");
           if (res.ok) {
@@ -578,23 +578,7 @@
           // offline or direct static mode
         }
 
-        // 2. Direct cloud REST API fallback (api.restful-api.dev)
-        if (!isFetchSuccessful) {
-          try {
-            const cloudRes = await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
-              headers: { "Accept": "application/json" }
-            });
-            if (cloudRes.ok) {
-              const cloudJson = await cloudRes.json();
-              if (cloudJson && cloudJson.data) {
-                serverData = cloudJson.data;
-                isFetchSuccessful = true;
-              }
-            }
-          } catch(e) {}
-        }
-
-        // 3. Process data when network fetch succeeds
+        // 2. Process data when network fetch succeeds
         if (isFetchSuccessful && serverData) {
           const summaries = serverData.summaries || [];
           const tasks = serverData.tasks || [];
@@ -603,9 +587,9 @@
             // Cloud database is empty (cleared by admin or completely fresh)
             this.records = [];
             this.rawTasks = [];
-            localStorage.removeItem("taskgpt_admin_persistent_records");
-            localStorage.removeItem("taskgpt_admin_persistent_tasks");
-            localStorage.removeItem("admin_recorded_tasks");
+            try {
+              localStorage.clear();
+            } catch(e) {}
           } else {
             // Active records from participants exist in the cloud!
             this.records = this.normalizeServerSummaries(summaries);
@@ -626,7 +610,7 @@
           return;
         }
 
-        // 4. Offline Fallback: If network fetch failed, DO NOT wipe data! Keep the cached records.
+        // 3. Offline Fallback: If network fetch failed, DO NOT wipe data! Keep the cached records.
         if (!isBackground) {
           this.showToast("Offline mode: showing saved records.");
         }
@@ -936,20 +920,8 @@
         this.records = [];
         this.rawTasks = [];
 
-        localStorage.removeItem("taskgpt_admin_persistent_records");
-        localStorage.removeItem("taskgpt_admin_persistent_tasks");
-        localStorage.removeItem("admin_recorded_tasks");
-        localStorage.removeItem("study_participant_code");
-        localStorage.removeItem("study_completed_tasks");
-
-        // Clear any other study-related keys in localStorage
         try {
-          for (let i = localStorage.length - 1; i >= 0; i--) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith("taskgpt") || key.startsWith("study") || key.startsWith("admin"))) {
-              localStorage.removeItem(key);
-            }
-          }
+          localStorage.clear();
         } catch(e) {}
 
         // Render immediately so user sees clean empty state with 0 delay
@@ -957,22 +929,15 @@
         this.renderStats();
         this.showToast("All study data cleared successfully.");
 
-        // 2. Wipe serverless API backend
+        // 2. Wipe serverless API backend (which clears cloud persistent store)
         try {
-          await fetch("/api/clear_data", { method: "POST" });
-        } catch (e) {}
-
-        // 3. Wipe cloud REST object
-        try {
-          await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: "TaskGPT Study Dataset",
-              data: { summaries: [], tasks: [], cleared_at: new Date().toISOString() }
-            })
-          });
-        } catch (e) {}
+          const res = await fetch("/api/clear_data", { method: "POST" });
+          if (res.ok) {
+            await this.loadData(true);
+          }
+        } catch (e) {
+          console.warn("Clear data API error:", e);
+        }
       }
     }
 
