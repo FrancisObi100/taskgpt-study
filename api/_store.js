@@ -47,7 +47,7 @@ let memoryData = {
   tasks: []
 };
 
-const CLOUD_DATA_URL = "https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371";
+const CLOUD_DATA_URL = "https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4";
 
 async function readFromStorage() {
   // Option 1: Vercel KV / Upstash Redis
@@ -124,18 +124,15 @@ async function writeToStorage(data) {
       signal: controller.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: "TaskGPT Study Dataset",
+        name: "TaskGPT Study Dataset 2026",
         data: data
       })
     });
     clearTimeout(timer);
-    if (!res.ok) {
-      const errText = await res.text();
-      return { ok: false, status: res.status, statusText: res.statusText, errText };
-    }
-    return { ok: true, status: res.status };
+    return res.ok;
   } catch (err) {
-    return { ok: false, error: err.message };
+    console.warn("Cloud storage write error:", err.message);
+    return false;
   }
 
   return true;
@@ -184,8 +181,8 @@ async function registerParticipantSession(payload) {
   }
 
   summaries.sort((a, b) => a.participant_code.localeCompare(b.participant_code, undefined, { numeric: true }));
-  const writeSuccess = await writeToStorage({ summaries, tasks });
-  return { status: "ok", message: "Participant session registered", writeSuccess, summary };
+  await writeToStorage({ summaries, tasks });
+  return { status: "ok", message: "Participant session registered", summary };
 }
 
 async function recordTaskTime(payload) {

@@ -2312,7 +2312,7 @@ You would need to save approximately £667 per month.`;
 
         // Direct cloud sync fallback (ensures cross-device linking across Vercel lambdas)
         try {
-          fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+          fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
             headers: { "Accept": "application/json" }
           }).then(function(res) { return res.json(); }).then(function(json) {
             var data = (json && json.data) ? json.data : { summaries: [], tasks: [] };
@@ -2358,7 +2358,7 @@ You would need to save approximately £667 per month.`;
             summary.is_completed = (t1 > 0 && t2 > 0 && t3 > 0) ? 1 : 0;
             summary.last_updated = new Date().toISOString();
 
-            fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+            fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -2465,7 +2465,7 @@ You would need to save approximately £667 per month.`;
 
         // 2. Direct cloud REST sync fallback
         try {
-          fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+          fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
             headers: { "Accept": "application/json" }
           }).then(function(res) { return res.json(); }).then(function(json) {
             var data = (json && json.data) ? json.data : { summaries: [], tasks: [] };
@@ -2489,7 +2489,7 @@ You would need to save approximately £667 per month.`;
                 return (a.participant_code || "").localeCompare(b.participant_code || "", undefined, { numeric: true });
               });
 
-              fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+              fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

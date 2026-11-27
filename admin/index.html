@@ -581,7 +581,7 @@
         // 2. Direct cloud REST API fallback (api.restful-api.dev)
         if (!isFetchSuccessful) {
           try {
-            const cloudRes = await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+            const cloudRes = await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
               headers: { "Accept": "application/json" }
             });
             if (cloudRes.ok) {
@@ -964,7 +964,7 @@
 
         // 3. Wipe cloud REST object
         try {
-          await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21c9e7c356371", {
+          await fetch("https://api.restful-api.dev/objects/ff808181a09d98f701a21d29ce1465a4", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
